@@ -23,7 +23,23 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/posts', postRoutes);
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/health', (req, res) => {
+  const routes = {
+    '/api/auth/signup': 'POST - User signup',
+    '/api/auth/login': 'POST - User login',
+    '/api/auth/profile': 'GET - Get user profile (protected)',
+    '/api/profile': 'POST - Create or update profile (protected)',
+    '/api/profile': 'GET - Get profile (protected)',
+    '/api/posts': 'POST - Create a new post (protected)',
+    '/api/posts': 'GET - Get all posts (feed)',
+    '/api/posts/user/:userId': 'GET - Get posts by a specific user',
+    '/api/posts/:postId/like': 'POST - Like or unlike a post (protected)',
+    '/api/posts/:postId/comment': 'POST - Add a comment to a post (protected)',
+    '/api/posts/:postId': 'DELETE - Delete a post (protected)',
+    '/health': 'GET - Health check'
+  };
+  res.json({ status: 'ok', routes });
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
