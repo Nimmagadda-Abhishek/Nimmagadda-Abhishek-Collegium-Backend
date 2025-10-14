@@ -18,8 +18,10 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
+const postRoutes = require('./routes/post');
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/posts', postRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
