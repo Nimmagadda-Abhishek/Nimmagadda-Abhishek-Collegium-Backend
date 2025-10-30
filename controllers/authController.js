@@ -36,24 +36,31 @@ if (!admin.apps.length) {
 
 // Signup function
 const signup = async (req, res) => {
+  console.log('Signup API called with data:', { idToken: req.body.idToken ? '[PRESENT]' : '[MISSING]', fullName: req.body.fullName, collegeName: req.body.collegeName });
+
   try {
     const { idToken, fullName, collegeName } = req.body;
 
     if (!idToken || !fullName || !collegeName) {
+      console.error('Signup validation failed: Missing required fields');
       return res.status(400).json({ error: 'ID token, full name, and college name are required' });
     }
 
+    console.log('Verifying Firebase ID token...');
     // Verify the ID token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const { uid, email, name, picture } = decodedToken;
+    console.log('Firebase token verified for user:', email);
 
     // Check if user already exists
     let user = await User.findOne({ firebaseUid: uid });
 
     if (user) {
+      console.error('Signup failed: User already exists with Firebase UID:', uid);
       return res.status(400).json({ error: 'User already exists' });
     }
 
+    console.log('Creating new user in database...');
     // Create new user
     user = new User({
       firebaseUid: uid,
@@ -65,9 +72,11 @@ const signup = async (req, res) => {
     });
 
     await user.save();
+    console.log('User created successfully with ID:', user._id);
 
     // Generate JWT token
     const token = jwt.sign({ userId: user._id, firebaseUid: uid }, JWT_SECRET, { expiresIn: '7d' });
+    console.log('JWT token generated for user:', user._id);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -82,28 +91,38 @@ const signup = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error('Signup error:', error);
+    console.error('Signup error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 // Login function
 const login = async (req, res) => {
+  console.log('Login API called with data:', { idToken: req.body.idToken ? '[PRESENT]' : '[MISSING]' });
+
   try {
     const { idToken } = req.body;
 
     if (!idToken) {
+      console.error('Login validation failed: ID token is required');
       return res.status(400).json({ error: 'ID token is required' });
     }
 
+    console.log('Verifying Firebase ID token...');
     // Verify the ID token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const { uid, email, name, picture } = decodedToken;
+    console.log('Firebase token verified for user:', email);
 
     // Find user
     let user = await User.findOne({ firebaseUid: uid });
 
     if (!user) {
+      console.log('User not found, creating new user during login...');
       // If user doesn't exist, create one (auto-signup on login)
       user = new User({
         firebaseUid: uid,
@@ -112,14 +131,18 @@ const login = async (req, res) => {
         photoURL: picture,
       });
       await user.save();
+      console.log('New user created during login with ID:', user._id);
     } else {
+      console.log('Existing user found, updating last login...');
       // Update last login
       user.lastLogin = new Date();
       await user.save();
+      console.log('User last login updated for ID:', user._id);
     }
 
     // Generate JWT token
     const token = jwt.sign({ userId: user._id, firebaseUid: uid }, JWT_SECRET, { expiresIn: '7d' });
+    console.log('JWT token generated for user:', user._id);
 
     res.status(200).json({
       message: 'Login successful',
@@ -132,36 +155,52 @@ const login = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 };
 
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
+  console.log('verifyToken middleware called for path:', req.path);
+
   const token = req.header('Authorization')?.replace('Bearer ', '');
 
   if (!token) {
+    console.error('verifyToken failed: No token provided in Authorization header');
     return res.status(401).json({ error: 'Access denied. No token provided.' });
   }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    console.log('verifyToken successful for user:', decoded.userId);
     next();
   } catch (error) {
+    console.error('verifyToken failed: Invalid token', {
+      message: error.message,
+      name: error.name
+    });
     res.status(400).json({ error: 'Invalid token.' });
   }
 };
 
 // Get user profile
 const getProfile = async (req, res) => {
+  console.log('Get profile API called for user:', req.user.userId);
+
   try {
     const user = await User.findById(req.user.userId);
     if (!user) {
+      console.error('Get profile failed: User not found with ID:', req.user.userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
+    console.log('Get profile successful for user:', user._id);
     res.status(200).json({
       user: {
         id: user._id,
@@ -175,7 +214,12 @@ const getProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    console.error('Get profile error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      userId: req.user?.userId
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 };

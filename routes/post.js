@@ -6,13 +6,14 @@ const {
   likePost,
   addComment,
   deletePost,
+  upload,
 } = require('../controllers/postController');
 const { verifyToken } = require('../controllers/authController');
 
 const router = express.Router();
 
-// Create a new post (protected)
-router.post('/', verifyToken, createPost);
+// Create a new post (protected) - with multer middleware for image upload
+router.post('/', verifyToken, upload.single('image'), createPost);
 
 // Get all posts (feed)
 router.get('/', getPosts);

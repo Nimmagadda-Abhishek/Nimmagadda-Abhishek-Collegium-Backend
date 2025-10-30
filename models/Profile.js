@@ -12,12 +12,15 @@ const profileSchema = new mongoose.Schema({
   },
   bio: {
     type: String,
+    required: true,
   },
   branch: {
     type: String, // e.g., Computer Science, Mechanical Engineering
+    required: true,
   },
   year: {
     type: String, // e.g., 1st Year, 2nd Year, or number
+    required: true,
   },
   githubProfile: {
     username: String,

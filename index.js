@@ -11,17 +11,35 @@ mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log('Connected to MongoDB'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Middleware for CORS
+app.use(cors({
+  origin: '*',
+  methods: 'GET,POST,PUT,DELETE,OPTIONS',
+  allowedHeaders: '*'
+}));
+
+// Middleware for parsing JSON and URL-encoded bodies
+// It's crucial to have these before the routes.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Middleware to log request body for debugging
+app.use((req, res, next) => {
+  console.log('Incoming Request Body:', req.body);
+  next();
+});
 
 // Routes
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
 const postRoutes = require('./routes/post');
+const subscriptionRoutes = require('./routes/subscriptions');
+const paymentRoutes = require('./routes/payments');
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.get('/health', (req, res) => {
   const routes = {
@@ -36,6 +54,17 @@ app.get('/health', (req, res) => {
     '/api/posts/:postId/like': 'POST - Like or unlike a post (protected)',
     '/api/posts/:postId/comment': 'POST - Add a comment to a post (protected)',
     '/api/posts/:postId': 'DELETE - Delete a post (protected)',
+    '/api/subscriptions/plans': 'GET - List all subscription plans',
+    '/api/subscriptions/user': 'GET - Get user subscription (protected)',
+    '/api/subscriptions/subscribe': 'POST - Subscribe to a plan (protected)',
+    '/api/subscriptions/cancel': 'PUT - Cancel subscription (protected)',
+    '/api/subscriptions/history': 'GET - Get subscription history (protected)',
+    '/api/subscriptions/trials/start': 'POST - Start trial (protected)',
+    '/api/subscriptions/trials/status': 'GET - Get trial status (protected)',
+    '/api/subscriptions/trials/convert': 'POST - Convert trial to paid (protected)',
+    '/api/payments/create-order': 'POST - Create payment order (protected)',
+    '/api/payments/verify': 'POST - Verify payment (protected)',
+    '/api/payments/webhook': 'POST - Handle payment webhooks',
     '/health': 'GET - Health check'
   };
   res.json({ status: 'ok', routes });
