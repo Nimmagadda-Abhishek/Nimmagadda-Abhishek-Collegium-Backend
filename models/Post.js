@@ -6,6 +6,11 @@ const postSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
+    collegeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'College',
+        required: true,
+    },
     caption: {
         type: String,
         required: true,

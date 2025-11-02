@@ -16,7 +16,7 @@ const router = express.Router();
 router.post('/', verifyToken, upload.single('image'), createPost);
 
 // Get all posts (feed)
-router.get('/', getPosts);
+router.get('/', verifyToken, getPosts);
 
 // Get posts by a specific user
 router.get('/user/:userId', getUserPosts);

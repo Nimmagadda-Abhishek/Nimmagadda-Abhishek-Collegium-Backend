@@ -2,6 +2,7 @@ const Post = require('../models/Post');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const { checkLimitExceeded } = require('../utils/subscriptionUtils');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -40,6 +41,13 @@ const createPost = async (req, res) => {
       return res.status(400).json({ error: 'Image is required' });
     }
 
+    // Check subscription limits
+    const limitExceeded = await checkLimitExceeded(userId, 'chats');
+    if (limitExceeded) {
+      console.error('Create post failed: Monthly post limit exceeded for user:', userId);
+      return res.status(403).json({ error: 'Monthly post creation limit exceeded. Upgrade your plan for more posts.' });
+    }
+
     console.log('Uploading image to Cloudinary...');
     // The image URL is provided by Cloudinary in req.file.path
     const imageUrl = req.file.path;
@@ -48,6 +56,7 @@ const createPost = async (req, res) => {
     console.log('Creating new post in database...');
     const newPost = new Post({
       user: userId,
+      collegeId: req.user.collegeId,
       caption,
       image: imageUrl,
     });
@@ -78,7 +87,7 @@ const getPosts = async (req, res) => {
   console.log('Get posts API called (feed)');
 
   try {
-    const posts = await Post.find()
+    const posts = await Post.find({ collegeId: req.user.collegeId })
       .populate('user', 'displayName photoURL')
       .populate('likes', 'displayName')
       .populate('comments.user', 'displayName')

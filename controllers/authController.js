@@ -1,6 +1,7 @@
 const admin = require('firebase-admin');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Profile = require('../models/Profile');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -36,14 +37,14 @@ if (!admin.apps.length) {
 
 // Signup function
 const signup = async (req, res) => {
-  console.log('Signup API called with data:', { idToken: req.body.idToken ? '[PRESENT]' : '[MISSING]', fullName: req.body.fullName, collegeName: req.body.collegeName });
+  console.log('Signup API called with data:', { idToken: req.body.idToken ? '[PRESENT]' : '[MISSING]', fullName: req.body.fullName });
 
   try {
-    const { idToken, fullName, collegeName } = req.body;
+    const { idToken, fullName } = req.body;
 
-    if (!idToken || !fullName || !collegeName) {
+    if (!idToken || !fullName) {
       console.error('Signup validation failed: Missing required fields');
-      return res.status(400).json({ error: 'ID token, full name, and college name are required' });
+      return res.status(400).json({ error: 'ID token and full name are required' });
     }
 
     console.log('Verifying Firebase ID token...');
@@ -51,6 +52,21 @@ const signup = async (req, res) => {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const { uid, email, name, picture } = decodedToken;
     console.log('Firebase token verified for user:', email);
+
+    // Extract domain from email
+    const domain = email.split('@')[1];
+    if (!domain) {
+      console.error('Signup failed: Invalid email format');
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Find college by domain
+    const College = require('../models/College');
+    const college = await College.findOne({ domain });
+    if (!college) {
+      console.error('Signup failed: No college found for domain:', domain);
+      return res.status(400).json({ error: 'Your email domain is not registered with any college' });
+    }
 
     // Check if user already exists
     let user = await User.findOne({ firebaseUid: uid });
@@ -67,15 +83,22 @@ const signup = async (req, res) => {
       email,
       displayName: name || email.split('@')[0],
       fullName,
-      collegeName,
+      collegeId: college._id,
+      collegeName: college.collegeName,
       photoURL: picture,
     });
 
     await user.save();
     console.log('User created successfully with ID:', user._id);
 
+    // Set Firebase custom claims
+    await admin.auth().setCustomUserClaims(uid, {
+      collegeId: college._id.toString(),
+    });
+    console.log('Firebase custom claims set for user:', uid);
+
     // Generate JWT token
-    const token = jwt.sign({ userId: user._id, firebaseUid: uid }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id, firebaseUid: uid, collegeId: college._id }, JWT_SECRET, { expiresIn: '7d' });
     console.log('JWT token generated for user:', user._id);
 
     res.status(201).json({
@@ -122,26 +145,30 @@ const login = async (req, res) => {
     let user = await User.findOne({ firebaseUid: uid });
 
     if (!user) {
-      console.log('User not found, creating new user during login...');
-      // If user doesn't exist, create one (auto-signup on login)
-      user = new User({
-        firebaseUid: uid,
-        email,
-        displayName: name || email.split('@')[0],
-        photoURL: picture,
-      });
-      await user.save();
-      console.log('New user created during login with ID:', user._id);
+      console.log('User not found during login. User must signup first.');
+      return res.status(404).json({ error: 'User not found. Please signup first.' });
     } else {
-      console.log('Existing user found, updating last login...');
-      // Update last login
+      console.log('Existing user found, updating last login and photo...');
+      // Update last login and photoURL if available
       user.lastLogin = new Date();
+      if (picture) {
+        user.photoURL = picture;
+      }
       await user.save();
-      console.log('User last login updated for ID:', user._id);
+      console.log('User last login and photo updated for ID:', user._id);
+    }
+
+    // Set Firebase custom claims if not set
+    const customClaims = await admin.auth().getUser(uid).then(userRecord => userRecord.customClaims);
+    if (!customClaims || !customClaims.collegeId) {
+      await admin.auth().setCustomUserClaims(uid, {
+        collegeId: user.collegeId.toString(),
+      });
+      console.log('Firebase custom claims set for user:', uid);
     }
 
     // Generate JWT token
-    const token = jwt.sign({ userId: user._id, firebaseUid: uid }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id, firebaseUid: uid, collegeId: user.collegeId }, JWT_SECRET, { expiresIn: '7d' });
     console.log('JWT token generated for user:', user._id);
 
     res.status(200).json({
@@ -224,9 +251,77 @@ const getProfile = async (req, res) => {
   }
 };
 
+// Search users by display name, email, or college name
+const searchUsers = async (req, res) => {
+  console.log('Search users API called with query:', req.query.q);
+
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      console.error('Search users validation failed: Query must be at least 2 characters');
+      return res.status(400).json({ error: 'Search query must be at least 2 characters long' });
+    }
+
+    const searchRegex = new RegExp(q.trim(), 'i'); // Case-insensitive regex
+
+    console.log('Searching users with regex:', searchRegex);
+    const users = await User.find({
+      collegeId: req.user.collegeId,
+      $or: [
+        { displayName: searchRegex },
+        { email: searchRegex },
+        { collegeName: searchRegex },
+      ],
+    })
+      .select('_id displayName email collegeName photoURL') // Include _id for profile lookup
+      .limit(20) // Limit results to prevent overload
+      .sort({ displayName: 1 }); // Sort alphabetically
+
+    // Fetch associated profiles
+    const userIds = users.map(user => user._id);
+    const profiles = await Profile.find({ user: { $in: userIds } }).select('user profileImage bio branch year');
+
+    // Create a map of userId to profile for easy lookup
+    const profileMap = {};
+    profiles.forEach(profile => {
+      profileMap[profile.user.toString()] = profile;
+    });
+
+    // Merge profile data into users
+    const usersWithProfiles = users.map(user => {
+      const userObj = user.toObject();
+      const profile = profileMap[user._id.toString()];
+      if (profile) {
+        userObj.profile = {
+          profileImage: profile.profileImage,
+          bio: profile.bio,
+          branch: profile.branch,
+          year: profile.year,
+        };
+      } else {
+        userObj.profile = null; // No profile exists
+      }
+      return userObj;
+    });
+
+    console.log('Search users successful, returned', usersWithProfiles.length, 'results');
+    res.status(200).json({ users: usersWithProfiles });
+  } catch (error) {
+    console.error('Search users error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      query: req.query?.q
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   signup,
   login,
   verifyToken,
   getProfile,
+  searchUsers,
 };

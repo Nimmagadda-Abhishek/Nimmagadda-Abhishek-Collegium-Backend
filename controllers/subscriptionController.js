@@ -258,14 +258,22 @@ const startTrial = async (req, res) => {
     const userId = req.user.userId;
     const { planId } = req.body;
 
+    if (!planId) {
+      return res.status(400).json({ error: 'Plan ID is required' });
+    }
+
     const plan = await SubscriptionPlan.findById(planId);
-    if (!plan || !plan.hasTrial) {
+    if (!plan) {
+      return res.status(400).json({ error: 'Plan not found' });
+    }
+    if (!plan.hasTrial) {
       return res.status(400).json({ error: 'Trial not available for this plan' });
     }
 
-    const existingTrial = await UserSubscription.findOne({ userId, status: 'trial' });
-    if (existingTrial) {
-      return res.status(400).json({ error: 'Trial already active' });
+    const existingSubscription = await UserSubscription.findOne({ userId, status: { $in: ['trial', 'active'] } });
+    if (existingSubscription) {
+      const statusMsg = existingSubscription.status === 'trial' ? 'trial' : 'active subscription';
+      return res.status(400).json({ error: `User already has an ${statusMsg}` });
     }
 
     const startDate = new Date();

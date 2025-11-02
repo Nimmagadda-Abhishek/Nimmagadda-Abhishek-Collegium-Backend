@@ -1,8 +1,5 @@
-# TODO: Switch from AWS S3 to Cloudinary for Image Uploads
+# TODO: Fix Trial Start 400 Error
 
-- [x] Update package.json: Remove @aws-sdk/client-s3, @aws-sdk/lib-storage, multer-s3; Add cloudinary, multer-storage-cloudinary
-- [x] Update .env: Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
-- [x] Update controllers/postController.js: Replace S3 configuration with Cloudinary upload using multer-storage-cloudinary
-- [x] Install new dependencies: npm install cloudinary multer-storage-cloudinary
-- [x] Uninstall old dependencies: npm uninstall @aws-sdk/client-s3 @aws-sdk/lib-storage multer-s3
-- [ ] Test the image upload functionality (run the server and verify uploads work)
+## Steps to Complete
+- [x] Modify startTrial function in controllers/subscriptionController.js to prevent starting a trial if user has an existing active or trial subscription
+- [x] Test the updated logic (run server and verify endpoint behavior)
