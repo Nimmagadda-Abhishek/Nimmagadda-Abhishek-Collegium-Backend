@@ -66,7 +66,7 @@ const getProjects = async (req, res) => {
   console.log('Get projects API called (feed)');
 
   try {
-    const projects = await Project.find({ collegeId: req.user.collegeId })
+    const projects = await Project.find({ collegeId: req.user.collegeId, isActive: true })
       .populate('user', 'displayName photoURL')
       .populate('collaborators', 'displayName photoURL')
       .sort({ createdAt: -1 }); // Most recent first
@@ -90,7 +90,7 @@ const getUserProjects = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const projects = await Project.find({ user: userId })
+    const projects = await Project.find({ user: userId, isActive: true })
       .populate('user', 'displayName photoURL')
       .populate('collaborators', 'displayName photoURL')
       .sort({ createdAt: -1 });
@@ -108,7 +108,7 @@ const getUserProjects = async (req, res) => {
   }
 };
 
-// Update a project (only by the owner)
+// Update a project (by owner or collaborators)
 const updateProject = async (req, res) => {
   console.log('Update project API called for project:', req.params.projectId, 'by user:', req.user.userId);
 
@@ -123,9 +123,12 @@ const updateProject = async (req, res) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    if (project.user.toString() !== userId) {
-      console.error('Update project failed: User', userId, 'not authorized to update project', projectId, 'owned by', project.user);
-      return res.status(403).json({ error: 'You can only update your own projects' });
+    const isOwner = project.user.toString() === userId;
+    const isCollaborator = project.collaborators.includes(userId);
+
+    if (!isOwner && !isCollaborator) {
+      console.error('Update project failed: User', userId, 'not authorized to update project', projectId);
+      return res.status(403).json({ error: 'Only project owner and collaborators can update the project' });
     }
 
     console.log('Updating project:', projectId);
@@ -158,7 +161,7 @@ const updateProject = async (req, res) => {
   }
 };
 
-// Delete a project (only by the owner)
+// Delete a project (only by the owner) - soft delete
 const deleteProject = async (req, res) => {
   console.log('Delete project API called for project:', req.params.projectId, 'by user:', req.user.userId);
 
@@ -177,9 +180,10 @@ const deleteProject = async (req, res) => {
       return res.status(403).json({ error: 'You can only delete your own projects' });
     }
 
-    console.log('Deleting project:', projectId, 'by owner:', userId);
-    await Project.findByIdAndDelete(projectId);
-    console.log('Project deleted successfully:', projectId);
+    console.log('Soft deleting project:', projectId, 'by owner:', userId);
+    project.isActive = false;
+    await project.save();
+    console.log('Project soft deleted successfully:', projectId);
 
     res.status(200).json({ message: 'Project deleted successfully' });
   } catch (error) {
@@ -194,7 +198,7 @@ const deleteProject = async (req, res) => {
   }
 };
 
-// Add a collaborator to a project (only by the owner, if collaborations allowed)
+// Add a collaborator to a project (by owner or existing collaborators, if collaborations allowed)
 const addCollaborator = async (req, res) => {
   console.log('Add collaborator API called for project:', req.params.projectId, 'by user:', req.user.userId, 'collaborator:', req.body.collaboratorId);
 
@@ -214,9 +218,12 @@ const addCollaborator = async (req, res) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    if (project.user.toString() !== userId) {
-      console.error('Add collaborator failed: User', userId, 'not authorized to add collaborators to project', projectId, 'owned by', project.user);
-      return res.status(403).json({ error: 'You can only add collaborators to your own projects' });
+    const isOwner = project.user.toString() === userId;
+    const isCollaborator = project.collaborators.includes(userId);
+
+    if (!isOwner && !isCollaborator) {
+      console.error('Add collaborator failed: User', userId, 'not authorized to add collaborators to project', projectId);
+      return res.status(403).json({ error: 'Only project owner and collaborators can add new collaborators' });
     }
 
     if (!project.allowCollaborations) {
@@ -227,6 +234,11 @@ const addCollaborator = async (req, res) => {
     if (project.collaborators.includes(collaboratorId)) {
       console.error('Add collaborator failed: User', collaboratorId, 'is already a collaborator on project', projectId);
       return res.status(400).json({ error: 'User is already a collaborator' });
+    }
+
+    if (collaboratorId === userId) {
+      console.error('Add collaborator failed: User cannot add themselves as collaborator');
+      return res.status(400).json({ error: 'You cannot add yourself as a collaborator' });
     }
 
     console.log('Adding collaborator to project:', projectId);
@@ -342,6 +354,95 @@ const getProject = async (req, res) => {
   }
 };
 
+// Like or unlike a project
+const likeProject = async (req, res) => {
+  console.log('Like project API called for project:', req.params.projectId, 'by user:', req.user.userId);
+
+  try {
+    const { projectId } = req.params;
+    const userId = req.user.userId;
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      console.error('Like project failed: Project not found with ID:', projectId);
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    const isLiked = project.likes.includes(userId);
+
+    if (isLiked) {
+      console.log('Unliking project:', projectId, 'by user:', userId);
+      // Unlike the project
+      project.likes = project.likes.filter(id => id.toString() !== userId);
+    } else {
+      console.log('Liking project:', projectId, 'by user:', userId);
+      // Like the project
+      project.likes.push(userId);
+    }
+
+    await project.save();
+    console.log('Like/unlike operation successful for project:', projectId, 'new likes count:', project.likes.length);
+
+    res.status(200).json({
+      message: isLiked ? 'Project unliked' : 'Project liked',
+      likesCount: project.likes.length,
+    });
+  } catch (error) {
+    console.error('Like project error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      projectId: req.params?.projectId,
+      userId: req.user?.userId
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get trending projects (filtered by likes, recent, and active status)
+const getTrendingProjects = async (req, res) => {
+  console.log('Get trending projects API called');
+
+  try {
+    const { filter } = req.query; // 'trending', 'recent', 'active'
+
+    let sortCriteria = {};
+    let filterCriteria = { collegeId: req.user.collegeId };
+
+    if (filter === 'trending') {
+      // Sort by number of likes descending, then by createdAt descending
+      sortCriteria = { 'likes': -1, createdAt: -1 };
+    } else if (filter === 'recent') {
+      // Sort by createdAt descending
+      sortCriteria = { createdAt: -1 };
+    } else if (filter === 'active') {
+      // Filter by isActive: true, sort by createdAt descending
+      filterCriteria.isActive = true;
+      sortCriteria = { createdAt: -1 };
+    } else {
+      // Default: sort by createdAt descending
+      sortCriteria = { createdAt: -1 };
+    }
+
+    const projects = await Project.find(filterCriteria)
+      .populate('user', 'displayName photoURL')
+      .populate('collaborators', 'displayName photoURL')
+      .populate('likes', 'displayName')
+      .sort(sortCriteria)
+      .limit(50); // Limit to top 50
+
+    console.log('Get trending projects successful, returned', projects.length, 'projects with filter:', filter);
+    res.status(200).json({ projects });
+  } catch (error) {
+    console.error('Get trending projects error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Search projects by name or collaborator
 const searchProjects = async (req, res) => {
   console.log('Search projects API called with query:', req.query.q);
@@ -363,6 +464,7 @@ const searchProjects = async (req, res) => {
 
     const projects = await Project.find({
       collegeId: req.user.collegeId,
+      isActive: true,
       $or: [
         { name: searchRegex },
         { collaborators: { $in: userIds } },
@@ -370,6 +472,7 @@ const searchProjects = async (req, res) => {
     })
       .populate('user', 'displayName photoURL')
       .populate('collaborators', 'displayName photoURL')
+      .populate('likes', 'displayName')
       .limit(20) // Limit results to prevent overload
       .sort({ createdAt: -1 }); // Most recent first
 
@@ -395,5 +498,7 @@ module.exports = {
   deleteProject,
   addCollaborator,
   removeCollaborator,
+  likeProject,
+  getTrendingProjects,
   searchProjects,
 };

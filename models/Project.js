@@ -37,6 +37,14 @@ const projectSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
 }, {
   timestamps: true, // Adds createdAt and updatedAt
 });

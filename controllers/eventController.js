@@ -1,6 +1,7 @@
 const Event = require('../models/Event');
 const User = require('../models/User');
 const { checkLimitExceeded } = require('../utils/subscriptionUtils');
+const { sendEventReminder, sendNewEventNotification } = require('../utils/notificationService');
 
 // Create a new event (only by college admin)
 const createEvent = async (req, res) => {
@@ -31,6 +32,10 @@ const createEvent = async (req, res) => {
     });
 
     await event.save();
+
+    // Send notification to all college users
+    setImmediate(() => sendNewEventNotification(event._id));
+
     res.status(201).json({ message: 'Event created successfully', event });
   } catch (error) {
     console.error('Create event error:', error);
@@ -128,6 +133,82 @@ const getAdminEvents = async (req, res) => {
   }
 };
 
+// Like or unlike an event
+const likeEvent = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user.userId;
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const isLiked = event.likes.includes(userId);
+
+    if (isLiked) {
+      // Unlike the event
+      event.likes = event.likes.filter(id => id.toString() !== userId);
+    } else {
+      // Like the event
+      event.likes.push(userId);
+    }
+
+    await event.save();
+
+    res.status(200).json({
+      message: isLiked ? 'Event unliked' : 'Event liked',
+      likesCount: event.likes.length,
+    });
+  } catch (error) {
+    console.error('Like event error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get trending events (sorted by likes count descending)
+const getTrendingEvents = async (req, res) => {
+  try {
+    const events = await Event.find({ collegeId: req.user.collegeId })
+      .populate('createdBy', 'displayName email')
+      .sort({ 'likes.length': -1, date: 1 }); // Sort by likes count descending, then by date ascending
+
+    res.status(200).json({ events });
+  } catch (error) {
+    console.error('Get trending events error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Search events by title and date
+const searchEvents = async (req, res) => {
+  try {
+    const { title, date } = req.query;
+    const query = { collegeId: req.user.collegeId };
+
+    if (title) {
+      query.title = { $regex: title, $options: 'i' }; // Case-insensitive partial match
+    }
+
+    if (date) {
+      const searchDate = new Date(date);
+      if (isNaN(searchDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid date format' });
+      }
+      // Match events on the same date (ignoring time)
+      const startOfDay = new Date(searchDate.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(searchDate.setHours(23, 59, 59, 999));
+      query.date = { $gte: startOfDay, $lte: endOfDay };
+    }
+
+    const events = await Event.find(query).populate('createdBy', 'displayName email').sort({ date: 1 });
+    res.status(200).json({ events });
+  } catch (error) {
+    console.error('Search events error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Update event status (active, closed, postponed)
 const updateEventStatus = async (req, res) => {
   try {
@@ -161,5 +242,8 @@ module.exports = {
   getEventById,
   adminViewRegistrations,
   getAdminEvents,
+  likeEvent,
+  getTrendingEvents,
+  searchEvents,
   updateEventStatus,
 };

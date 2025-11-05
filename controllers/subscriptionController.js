@@ -1,6 +1,7 @@
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 const UserSubscription = require('../models/UserSubscription');
 const User = require('../models/User');
+const { sendSubscriptionEndingNotification, sendSubscriptionExpiredNotification, sendSubscriptionUpgradeReminder } = require('../utils/notificationService');
 
 // ====================
 // 📋 Get All Subscription Plans
@@ -179,6 +180,9 @@ const subscribe = async (req, res) => {
     });
 
     await subscription.save();
+
+    // Send upgrade reminder notification
+    setImmediate(() => sendSubscriptionUpgradeReminder(userId));
 
     res.status(201).json({
       success: true,

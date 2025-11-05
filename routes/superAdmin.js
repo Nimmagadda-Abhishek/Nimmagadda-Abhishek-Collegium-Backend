@@ -13,7 +13,10 @@ const {
   getAllProjects,
   getAllSubscriptions,
   sendNotification,
-  verifySuperAdminToken
+  verifySuperAdminToken,
+  blockUser,
+  unblockUser,
+  deleteUserAccount
 } = require('../controllers/superAdminController');
 
 const router = express.Router();
@@ -47,6 +50,11 @@ router.post('/colleges', verifySuperAdminToken, createCollege);
 router.get('/colleges', verifySuperAdminToken, getColleges);
 router.put('/colleges/:collegeId', verifySuperAdminToken, updateCollege);
 router.delete('/colleges/:collegeId', verifySuperAdminToken, deleteCollege);
+
+// User management routes (protected)
+router.post('/users/:userId/block', verifySuperAdminToken, blockUser);
+router.post('/users/:userId/unblock', verifySuperAdminToken, unblockUser);
+router.delete('/users/:userId', verifySuperAdminToken, deleteUserAccount);
 
 // Send notification route (protected)
 router.post('/notifications', verifySuperAdminToken, sendNotification);

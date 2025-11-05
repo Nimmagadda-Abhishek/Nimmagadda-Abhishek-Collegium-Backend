@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, getProfile, searchUsers, verifyToken } = require('../controllers/authController');
+const { signup, login, getProfile, searchUsers, verifyToken, deleteAccount, blockUser, unblockUser } = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -14,6 +14,15 @@ router.get('/profile', verifyToken, getProfile);
 
 // Search users (protected route)
 router.get('/search', verifyToken, searchUsers);
+
+// Delete account (protected route)
+router.delete('/delete-account', verifyToken, deleteAccount);
+
+// Block user (protected route)
+router.post('/block/:userId', verifyToken, blockUser);
+
+// Unblock user (protected route)
+router.post('/unblock/:userId', verifyToken, unblockUser);
 
 // Get approved colleges for signup
 router.get('/colleges', async (req, res) => {

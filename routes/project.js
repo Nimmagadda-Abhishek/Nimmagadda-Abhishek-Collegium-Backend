@@ -8,6 +8,8 @@ const {
   deleteProject,
   addCollaborator,
   removeCollaborator,
+  likeProject,
+  getTrendingProjects,
   searchProjects,
 } = require('../controllers/projectController');
 const { verifyToken } = require('../controllers/authController');
@@ -40,5 +42,11 @@ router.post('/:projectId/collaborator', verifyToken, addCollaborator);
 
 // Remove a collaborator from a project (protected)
 router.delete('/:projectId/collaborator', verifyToken, removeCollaborator);
+
+// Like or unlike a project (protected)
+router.post('/:projectId/like', verifyToken, likeProject);
+
+// Get trending projects (protected)
+router.get('/trending', verifyToken, getTrendingProjects);
 
 module.exports = router;

@@ -318,10 +318,128 @@ const searchUsers = async (req, res) => {
   }
 };
 
+// Delete user account (soft delete)
+const deleteAccount = async (req, res) => {
+  console.log('Delete account API called for user:', req.user.userId);
+
+  try {
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      console.error('Delete account failed: User not found with ID:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.isDeleted) {
+      console.error('Delete account failed: User already deleted with ID:', userId);
+      return res.status(400).json({ error: 'Account already deleted' });
+    }
+
+    // Soft delete the user
+    user.isDeleted = true;
+    user.deletedAt = new Date();
+    await user.save();
+
+    console.log('User account soft deleted successfully:', userId);
+
+    // Note: In a real application, you might want to anonymize or remove associated data
+    // For now, we'll keep the data but mark the user as deleted
+
+    res.status(200).json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Delete account error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      userId: req.user?.userId
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Block a user
+const blockUser = async (req, res) => {
+  console.log('Block user API called by user:', req.user.userId, 'to block user:', req.params.userId);
+
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+
+    if (userId === currentUserId) {
+      console.error('Block user failed: User cannot block themselves');
+      return res.status(400).json({ error: 'You cannot block yourself' });
+    }
+
+    const userToBlock = await User.findById(userId);
+    if (!userToBlock) {
+      console.error('Block user failed: User to block not found with ID:', userId);
+      return res.status(404).json({ error: 'User to block not found' });
+    }
+
+    const currentUser = await User.findById(currentUserId);
+    if (currentUser.blockedUsers.includes(userId)) {
+      console.error('Block user failed: User already blocked with ID:', userId);
+      return res.status(400).json({ error: 'User already blocked' });
+    }
+
+    currentUser.blockedUsers.push(userId);
+    await currentUser.save();
+
+    console.log('User blocked successfully:', userId, 'by user:', currentUserId);
+
+    res.status(200).json({ message: 'User blocked successfully' });
+  } catch (error) {
+    console.error('Block user error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      userId: req.user?.userId,
+      blockUserId: req.params?.userId
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Unblock a user
+const unblockUser = async (req, res) => {
+  console.log('Unblock user API called by user:', req.user.userId, 'to unblock user:', req.params.userId);
+
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
+
+    const currentUser = await User.findById(currentUserId);
+    if (!currentUser.blockedUsers.includes(userId)) {
+      console.error('Unblock user failed: User not blocked with ID:', userId);
+      return res.status(400).json({ error: 'User not blocked' });
+    }
+
+    currentUser.blockedUsers = currentUser.blockedUsers.filter(id => id.toString() !== userId);
+    await currentUser.save();
+
+    console.log('User unblocked successfully:', userId, 'by user:', currentUserId);
+
+    res.status(200).json({ message: 'User unblocked successfully' });
+  } catch (error) {
+    console.error('Unblock user error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      userId: req.user?.userId,
+      unblockUserId: req.params?.userId
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   signup,
   login,
   verifyToken,
   getProfile,
   searchUsers,
+  deleteAccount,
+  blockUser,
+  unblockUser,
 };

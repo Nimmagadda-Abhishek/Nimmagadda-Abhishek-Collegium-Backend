@@ -39,6 +39,7 @@ const paymentRoutes = require('./routes/payments');
 const eventRoutes = require('./routes/event');
 const collegeAdminRoutes = require('./routes/collegeAdmin');
 const superAdminRoutes = require('./routes/superAdmin');
+const notificationRoutes = require('./routes/notifications');
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/posts', postRoutes);
@@ -48,6 +49,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/college-admin', collegeAdminRoutes);
 app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/health', (req, res) => {
   const routes = {

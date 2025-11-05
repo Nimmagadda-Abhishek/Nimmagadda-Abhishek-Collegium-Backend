@@ -39,6 +39,20 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
+  deletedAt: {
+    type: Date,
+  },
+  blockedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  fcmToken: {
+    type: String, // Store FCM registration token for push notifications
+  },
 });
 
 module.exports = mongoose.model('User', userSchema);

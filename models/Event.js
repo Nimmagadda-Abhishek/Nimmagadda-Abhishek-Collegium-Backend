@@ -51,6 +51,10 @@ const eventSchema = new mongoose.Schema({
       default: Date.now,
     },
   }],
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
   status: {
     type: String,
     enum: ['active', 'closed', 'postponed'],

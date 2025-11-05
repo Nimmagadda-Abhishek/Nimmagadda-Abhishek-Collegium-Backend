@@ -1,8 +1,10 @@
 const Post = require('../models/Post');
+const User = require('../models/User');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const { checkLimitExceeded } = require('../utils/subscriptionUtils');
+const { sendPostLikeNotification, sendPostCommentNotification } = require('../utils/notificationService');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -87,7 +89,16 @@ const getPosts = async (req, res) => {
   console.log('Get posts API called (feed)');
 
   try {
-    const posts = await Post.find({ collegeId: req.user.collegeId })
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Get posts from the same college, excluding posts from blocked users and deleted users
+    const posts = await Post.find({
+      collegeId: req.user.collegeId,
+      user: { $nin: [...currentUser.blockedUsers, ...await User.find({ isDeleted: true }).distinct('_id')] }
+    })
       .populate('user', 'displayName photoURL')
       .populate('likes', 'displayName')
       .populate('comments.user', 'displayName')
@@ -160,6 +171,11 @@ const likePost = async (req, res) => {
     await post.save();
     console.log('Like/unlike operation successful for post:', postId, 'new likes count:', post.likes.length);
 
+    // Send notification if liked (not unliked)
+    if (!isLiked) {
+      setImmediate(() => sendPostLikeNotification(postId, userId));
+    }
+
     res.status(200).json({
       message: isLiked ? 'Post unliked' : 'Post liked',
       likesCount: post.likes.length,
@@ -211,6 +227,9 @@ const addComment = async (req, res) => {
 
     const addedComment = post.comments[post.comments.length - 1];
     console.log('Comment added successfully to post:', postId, 'comment ID:', addedComment._id);
+
+    // Send notification
+    setImmediate(() => sendPostCommentNotification(postId, userId, text));
 
     res.status(201).json({
       message: 'Comment added successfully',
