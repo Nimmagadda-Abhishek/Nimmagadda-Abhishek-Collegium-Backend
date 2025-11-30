@@ -4,7 +4,6 @@ const Event = require('../models/Event');
 const UserSubscription = require('../models/UserSubscription');
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 const { sendPushNotification, sendPushNotificationToMultiple } = require('./firebaseService');
-const Notification = require('../models/Notification');
 
 // Helper functions for subscription notifications
 const MILESTONES = [1, 3, 7, 14, 30]; // Days before expiration
