@@ -91,6 +91,9 @@ const signup = async (req, res) => {
     await user.save();
     console.log('User created successfully with ID:', user._id);
 
+    // Send welcome notification
+    setImmediate(() => sendWelcomeNotification(user._id));
+
     // Set Firebase custom claims
     await admin.auth().setCustomUserClaims(uid, {
       collegeId: college._id.toString(),

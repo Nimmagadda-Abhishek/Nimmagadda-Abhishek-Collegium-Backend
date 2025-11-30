@@ -4,6 +4,7 @@ const Event = require('../models/Event');
 const UserSubscription = require('../models/UserSubscription');
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 const { sendPushNotification, sendPushNotificationToMultiple } = require('./firebaseService');
+const Notification = require('../models/Notification');
 
 // Helper functions for subscription notifications
 const MILESTONES = [1, 3, 7, 14, 30]; // Days before expiration
@@ -363,6 +364,22 @@ const sendOfflineMessageNotification = async (receiverId, senderId, message) => 
     );
   } catch (error) {
     console.error('Error sending offline message notification:', error);
+  }
+};
+
+// Welcome notification for new users
+const sendWelcomeNotification = async (userId) => {
+  try {
+    await createNotification(
+      userId,
+      'welcome',
+      'Welcome to Collegium!',
+      'Welcome to Collegium! 🎉 Explore events, connect with peers, and make the most of your college experience.',
+      {},
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Expires in 30 days
+    );
+  } catch (error) {
+    console.error('Error sending welcome notification:', error);
   }
 };
 
