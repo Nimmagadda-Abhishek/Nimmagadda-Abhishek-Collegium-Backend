@@ -1,14 +1,7 @@
-# TODO: Implement Account Deletion and Blocking Features
+# TODO: Create API to Get All Students in College
 
-## Steps to Complete
-
-- [x] Update User model to add isDeleted, deletedAt, and blockedUsers fields
-- [x] Add deleteAccount function to authController.js
-- [x] Add blockUser and unblockUser functions to authController.js
-- [x] Update postController.js to handle blocked users in getPosts, likePost, addComment
-- [x] Add blockUser and unblockUser functions to superAdminController.js
-- [x] Add deleteUserAccount function to superAdminController.js
-- [x] Update routes/auth.js to include delete account and block user routes
-- [x] Update routes/superAdmin.js to include block/unblock and delete user routes
-- [ ] Test the new endpoints
-- [ ] Update API documentation
+- [ ] Add `getAllStudents` function to `controllers/authController.js`
+- [ ] Export `getAllStudents` in `controllers/authController.js`
+- [x] Add `GET /students` route to `routes/auth.js`
+- [x] Update `USER_API_ENDPOINTS.md` with new endpoint documentation
+- [x] Test the API endpoint

@@ -436,12 +436,38 @@ const unblockUser = async (req, res) => {
   }
 };
 
+// Get all students (users) in the college
+const getAllStudents = async (req, res) => {
+  console.log('Get all students API called for college:', req.user.collegeId);
+
+  try {
+    const users = await User.find({
+      collegeId: req.user.collegeId,
+      isDeleted: false, // Exclude deleted users
+    })
+      .select('_id displayName email fullName collegeName photoURL createdAt') // Select relevant fields
+      .sort({ displayName: 1 }); // Sort alphabetically by display name
+
+    console.log('Get all students successful, returned', users.length, 'users');
+    res.status(200).json({ students: users });
+  } catch (error) {
+    console.error('Get all students error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      collegeId: req.user?.collegeId
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   signup,
   login,
   verifyToken,
   getProfile,
   searchUsers,
+  getAllStudents,
   deleteAccount,
   blockUser,
   unblockUser,

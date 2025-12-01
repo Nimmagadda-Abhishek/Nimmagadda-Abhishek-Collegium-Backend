@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, getProfile, searchUsers, verifyToken, deleteAccount, blockUser, unblockUser } = require('../controllers/authController');
+const { signup, login, getProfile, searchUsers, getAllStudents, verifyToken, deleteAccount, blockUser, unblockUser } = require('../controllers/authController');
 
 const router = express.Router();
 

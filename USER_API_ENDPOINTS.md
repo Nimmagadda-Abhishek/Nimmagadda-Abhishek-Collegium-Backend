@@ -103,6 +103,28 @@ This document lists all API endpoints except super admin ones, including sample 
 }
 ```
 
+### GET /api/auth/students
+**Description:** Get all students (users) in the authenticated user's college.
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Response (Success):**
+```json
+{
+  "students": [
+    {
+      "_id": "user_id",
+      "displayName": "john",
+      "email": "john@example.com",
+      "fullName": "John Doe",
+      "collegeName": "Example College",
+      "photoURL": "https://...",
+      "createdAt": "2023-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
 ### GET /api/auth/colleges
 **Description:** Get list of approved colleges for signup.
 
