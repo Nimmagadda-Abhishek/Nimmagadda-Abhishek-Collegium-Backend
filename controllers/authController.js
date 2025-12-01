@@ -108,6 +108,7 @@ const signup = async (req, res) => {
       message: 'User created successfully',
       user: {
         id: user._id,
+        firebaseUid: user.firebaseUid,
         email: user.email,
         displayName: user.displayName,
         fullName: user.fullName,
@@ -178,6 +179,7 @@ const login = async (req, res) => {
       message: 'Login successful',
       user: {
         id: user._id,
+        firebaseUid: user.firebaseUid,
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
@@ -234,6 +236,7 @@ const getProfile = async (req, res) => {
     res.status(200).json({
       user: {
         id: user._id,
+        firebaseUid: user.firebaseUid,
         email: user.email,
         displayName: user.displayName,
         fullName: user.fullName,
@@ -277,7 +280,7 @@ const searchUsers = async (req, res) => {
         { collegeName: searchRegex },
       ],
     })
-      .select('_id displayName email collegeName photoURL') // Include _id for profile lookup
+      .select('_id firebaseUid displayName email collegeName photoURL') // Include _id for profile lookup
       .limit(20) // Limit results to prevent overload
       .sort({ displayName: 1 }); // Sort alphabetically
 
@@ -294,6 +297,7 @@ const searchUsers = async (req, res) => {
     // Merge profile data into users
     const usersWithProfiles = users.map(user => {
       const userObj = user.toObject();
+      userObj.firebaseUid = user.firebaseUid; // Add firebaseUid
       const profile = profileMap[user._id.toString()];
       if (profile) {
         userObj.profile = {
@@ -436,6 +440,55 @@ const unblockUser = async (req, res) => {
   }
 };
 
+// Get a single user by ID (within same college)
+const getUserById = async (req, res) => {
+  console.log('Get user by ID API called for user:', req.params.userId, 'by user:', req.user.userId);
+
+  try {
+    const { userId } = req.params;
+
+    // Find the user
+    const user = await User.findOne({
+      _id: userId,
+      collegeId: req.user.collegeId, // Ensure user is in the same college
+      isDeleted: false, // Exclude deleted users
+    });
+
+    if (!user) {
+      console.error('Get user by ID failed: User not found or not in same college with ID:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Fetch associated profile if exists
+    const profile = await Profile.findOne({ user: userId }).select('profileImage bio branch year githubProfile linkedinProfile');
+
+    console.log('Get user by ID successful for user:', userId);
+    res.status(200).json({
+      user: {
+        id: user._id,
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        displayName: user.displayName,
+        fullName: user.fullName,
+        collegeName: user.collegeName,
+        photoURL: user.photoURL,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+        profile: profile || null,
+      },
+    });
+  } catch (error) {
+    console.error('Get user by ID error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      userId: req.user?.userId,
+      requestedUserId: req.params?.userId
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Get all students (users) in the college
 const getAllStudents = async (req, res) => {
   console.log('Get all students API called for college:', req.user.collegeId);
@@ -445,7 +498,7 @@ const getAllStudents = async (req, res) => {
       collegeId: req.user.collegeId,
       isDeleted: false, // Exclude deleted users
     })
-      .select('_id displayName email fullName collegeName photoURL createdAt') // Select relevant fields
+      .select('_id firebaseUid displayName email fullName collegeName photoURL createdAt') // Select relevant fields
       .sort({ displayName: 1 }); // Sort alphabetically by display name
 
     console.log('Get all students successful, returned', users.length, 'users');
@@ -468,6 +521,7 @@ module.exports = {
   getProfile,
   searchUsers,
   getAllStudents,
+  getUserById,
   deleteAccount,
   blockUser,
   unblockUser,

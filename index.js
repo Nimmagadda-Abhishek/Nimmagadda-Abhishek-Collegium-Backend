@@ -57,6 +57,7 @@ app.get('/health', (req, res) => {
     '/api/auth/login': 'POST - User login',
     '/api/auth/profile': 'GET - Get user profile (protected)',
     '/api/auth/search': 'GET - Search users (protected)',
+    '/api/auth/:userId': 'GET - Get user by ID (protected)',
     '/api/profile': 'POST - Create or update profile (protected)',
     '/api/profile': 'GET - Get profile (protected)',
     '/api/posts': 'POST - Create a new post (protected)',

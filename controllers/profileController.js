@@ -166,7 +166,7 @@ const getProfile = async (req, res) => {
 
     const profile = await Profile.findOne({ user: userId }).populate(
       'user',
-      'email displayName fullName collegeName photoURL'
+      'firebaseUid email displayName fullName collegeName photoURL'
     );
 
     if (!profile) {
@@ -189,10 +189,63 @@ const getProfile = async (req, res) => {
 };
 
 // ====================
+// 👥 Get College Users
+// ====================
+const getCollegeUsers = async (req, res) => {
+  console.log('➡️ Fetching college users for user:', req.user.userId);
+
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const collegeId = user.collegeId;
+
+    // Find profiles where the associated user's collegeId matches
+    const profiles = await Profile.find().populate({
+      path: 'user',
+      match: { collegeId },
+    });
+
+    // Filter out profiles where user is null (due to match)
+    const filteredProfiles = profiles.filter(profile => profile.user);
+
+    // Map to the required format
+    const users = filteredProfiles.map(profile => ({
+      firebaseUid: profile.user.firebaseUid,
+      name: profile.user.fullName,
+      email: profile.user.email,
+      avatar: profile.profileImage || profile.user.photoURL,
+      bio: profile.bio,
+      university: profile.user.collegeName,
+      major: profile.branch,
+      year: profile.year,
+      githubUsername: profile.githubProfile ? profile.githubProfile.username : null,
+    }));
+
+    console.log('✅ College users fetched for user:', userId);
+    return res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    console.error('❌ Get college users error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message,
+    });
+  }
+};
+
+// ====================
 // 🚀 Export
 // ====================
 module.exports = {
   upload,
   createOrUpdateProfile,
   getProfile,
+  getCollegeUsers,
 };

@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrUpdateProfile, getProfile, upload } = require('../controllers/profileController');
+const { createOrUpdateProfile, getProfile, getCollegeUsers, upload } = require('../controllers/profileController');
 const { verifyToken } = require('../controllers/authController');
 const multer = require('multer');
 
@@ -47,5 +47,8 @@ router.post('/', verifyToken, conditionalMulter, createOrUpdateProfile);
 
 // Get profile (protected route)
 router.get('/', verifyToken, getProfile);
+
+// Get college users (protected route)
+router.get('/college-users', verifyToken, getCollegeUsers);
 
 module.exports = router;
