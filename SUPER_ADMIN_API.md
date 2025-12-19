@@ -517,6 +517,30 @@ Common error responses:
 }
 ```
 
+### SubscriptionPlan Model
+```javascript
+{
+  name: String (required, unique),
+  price: Number (required),
+  period: String (required, enum: ['month', 'year']),
+  description: String (required),
+  features: [String],
+  limits: {
+    chats: Number,
+    projects: Number,
+    events: Number,
+    resources: Number
+  },
+  hasTrial: Boolean (default: false),
+  trialPrice: Number (default: 0),
+  trialDays: Number (default: 0),
+  popular: Boolean (default: false),
+  active: Boolean (default: true),
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
 ## API Integration Examples
 
 ### JavaScript (Node.js) - Login Example

@@ -17,7 +17,9 @@ const notificationSchema = new mongoose.Schema({
       'subscription_expired',
       'subscription_upgrade',
       'admin_custom',
-      'message_offline'
+      'message_offline',
+      'login_welcome_back',
+      'promotion'
     ],
     required: true,
   },

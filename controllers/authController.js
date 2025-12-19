@@ -2,29 +2,16 @@ const admin = require('firebase-admin');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Profile = require('../models/Profile');
+const { sendLoginWelcomeBackNotification } = require('../utils/notificationService');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
   try {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-    if (!privateKey || privateKey.includes('your-private-key')) {
-      throw new Error('Firebase private key not properly configured. Please set FIREBASE_PRIVATE_KEY in your .env file.');
-    }
-
-    const serviceAccount = {
-      type: "service_account",
-      project_id: process.env.FIREBASE_PROJECT_ID,
-      private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-      private_key: privateKey.replace(/\\n/g, '\n'),
-      client_email: process.env.FIREBASE_CLIENT_EMAIL,
-      client_id: process.env.FIREBASE_CLIENT_ID,
-      auth_uri: process.env.FIREBASE_AUTH_URI,
-      token_uri: process.env.FIREBASE_TOKEN_URI,
-      auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
-      client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-    };
+    // Use the service account JSON file path from environment variable
+    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH || './collegium-e1d79-firebase-adminsdk-fbsvc-ab69ff0e8a.json';
+    const serviceAccount = require(serviceAccountPath);
 
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
@@ -92,7 +79,7 @@ const signup = async (req, res) => {
     console.log('User created successfully with ID:', user._id);
 
     // Send welcome notification
-    setImmediate(() => sendWelcomeNotification(user._id));
+    // setImmediate(() => sendWelcomeNotification(user._id));
 
     // Set Firebase custom claims
     await admin.auth().setCustomUserClaims(uid, {
@@ -160,6 +147,9 @@ const login = async (req, res) => {
       }
       await user.save();
       console.log('User last login and photo updated for ID:', user._id);
+
+      // Send welcome back notification
+      setImmediate(() => sendLoginWelcomeBackNotification(user._id));
     }
 
     // Set Firebase custom claims if not set
@@ -501,8 +491,30 @@ const getAllStudents = async (req, res) => {
       .select('_id firebaseUid displayName email fullName collegeName photoURL createdAt') // Select relevant fields
       .sort({ displayName: 1 }); // Sort alphabetically by display name
 
-    console.log('Get all students successful, returned', users.length, 'users');
-    res.status(200).json({ students: users });
+    // Fetch associated profiles
+    const userIds = users.map(user => user._id);
+    const profiles = await Profile.find({ user: { $in: userIds } }).select('user profileImage');
+
+    // Create a map of userId to profile for easy lookup
+    const profileMap = {};
+    profiles.forEach(profile => {
+      profileMap[profile.user.toString()] = profile;
+    });
+
+    // Merge profile data into users
+    const studentsWithProfiles = users.map(user => {
+      const userObj = user.toObject();
+      const profile = profileMap[user._id.toString()];
+      if (profile) {
+        userObj.profileImage = profile.profileImage;
+      } else {
+        userObj.profileImage = null; // No profile exists
+      }
+      return userObj;
+    });
+
+    console.log('Get all students successful, returned', studentsWithProfiles.length, 'users');
+    res.status(200).json({ students: studentsWithProfiles });
   } catch (error) {
     console.error('Get all students error occurred:', {
       message: error.message,

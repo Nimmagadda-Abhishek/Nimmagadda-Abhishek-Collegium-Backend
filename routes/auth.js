@@ -15,6 +15,9 @@ router.get('/profile', verifyToken, getProfile);
 // Search users (protected route)
 router.get('/search', verifyToken, searchUsers);
 
+// Get all students (protected route)
+router.get('/students', verifyToken, getAllStudents);
+
 // Get user by ID (protected route)
 router.get('/:userId', verifyToken, getUserById);
 

@@ -159,9 +159,129 @@ const getUsers = async (req, res) => {
   }
 };
 
+// Get college admin profile
+const getProfile = async (req, res) => {
+  try {
+    const admin = await CollegeAdmin.findById(req.admin.adminId).populate('collegeId', 'collegeName domain');
+    if (!admin) {
+      return res.status(404).json({ error: 'College admin not found' });
+    }
+
+    res.status(200).json({
+      profile: {
+        id: admin._id,
+        email: admin.email,
+        collegeName: admin.collegeId.collegeName,
+        collegeDomain: admin.collegeId.domain,
+        isApproved: admin.isApproved,
+        createdAt: admin.createdAt,
+      }
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get dashboard statistics for college admin
+const getDashboardStats = async (req, res) => {
+  try {
+    const admin = await CollegeAdmin.findById(req.admin.adminId);
+    if (!admin) {
+      return res.status(404).json({ error: 'College admin not found' });
+    }
+
+    const collegeId = admin.collegeId;
+
+    // Get total students in the college
+    const profiles = await Profile.find().populate({
+      path: 'user',
+      match: { collegeId },
+    });
+    const totalStudents = profiles.filter(profile => profile.user).length;
+
+    // Get total events created by the admin
+    const Event = require('../models/Event');
+    const totalEvents = await Event.countDocuments({ createdBy: req.admin.adminId });
+
+    // Get total active events
+    const activeEvents = await Event.countDocuments({ createdBy: req.admin.adminId, status: 'active' });
+
+    // Get total event registrations across all admin's events
+    const events = await Event.find({ createdBy: req.admin.adminId });
+    const totalRegistrations = events.reduce((sum, event) => sum + event.registrations.length, 0);
+
+    res.status(200).json({
+      stats: {
+        totalStudents,
+        totalEvents,
+        activeEvents,
+        totalRegistrations,
+      }
+    });
+  } catch (error) {
+    console.error('Get dashboard stats error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get events created by the college admin
+const getEvents = async (req, res) => {
+  try {
+    const Event = require('../models/Event');
+    const events = await Event.find({ createdBy: req.admin.adminId })
+      .populate('createdBy', 'email')
+      .sort({ date: 1 });
+    res.status(200).json({ events });
+  } catch (error) {
+    console.error('Get events error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get students in the college (alias for getUsers but for college admin)
+const getStudents = async (req, res) => {
+  try {
+    const admin = await CollegeAdmin.findById(req.admin.adminId);
+    if (!admin) {
+      return res.status(404).json({ error: 'College admin not found' });
+    }
+
+    const collegeId = admin.collegeId;
+
+    // Find profiles where the associated user's collegeId matches
+    const profiles = await Profile.find().populate({
+      path: 'user',
+      match: { collegeId },
+    });
+
+    // Filter out profiles where user is null (due to match)
+    const filteredProfiles = profiles.filter(profile => profile.user);
+
+    // Map to the required format
+    const students = filteredProfiles.map(profile => ({
+      name: profile.user.fullName,
+      email: profile.user.email,
+      department: profile.branch,
+      year: profile.year,
+      status: 'active', // Placeholder as no status field exists
+      profileImage: profile.profileImage,
+    }));
+
+    res.status(200).json({ students });
+  } catch (error) {
+    console.error('Get students error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   register,
   login,
   verifyCollegeAdminToken,
   getUsers,
+  getProfile,
+  getDashboardStats,
+  getEvents,
+  getStudents,
 };

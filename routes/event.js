@@ -1,12 +1,12 @@
 const express = require('express');
-const { createEvent, registerForEvent, getEvents, getEventById, adminViewRegistrations, getAdminEvents, likeEvent, getTrendingEvents, searchEvents, updateEventStatus } = require('../controllers/eventController');
+const { createEvent, registerForEvent, getEvents, getEventById, adminViewRegistrations, getAdminEvents, likeEvent, getTrendingEvents, searchEvents, updateEventStatus, uploadEventBanner } = require('../controllers/eventController');
 const { verifyToken } = require('../controllers/authController');
 const { verifyCollegeAdminToken } = require('../controllers/collegeAdminController');
 
 const router = express.Router();
 
 // Create a new event (only college admin)
-router.post('/create', verifyCollegeAdminToken, createEvent);
+router.post('/create', verifyCollegeAdminToken, uploadEventBanner.single('banner'), createEvent);
 
 // Register for an event (user)
 router.post('/register/:eventId', verifyToken, registerForEvent);

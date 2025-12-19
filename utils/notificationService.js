@@ -4,6 +4,7 @@ const Event = require('../models/Event');
 const UserSubscription = require('../models/UserSubscription');
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 const { sendPushNotification, sendPushNotificationToMultiple } = require('./firebaseService');
+const { convertToFirebaseUid, convertToFirebaseUids, getUserByIdentifier } = require('./userUtils');
 
 // Helper functions for subscription notifications
 const MILESTONES = [1, 3, 7, 14, 30]; // Days before expiration
@@ -382,6 +383,74 @@ const sendWelcomeNotification = async (userId) => {
   }
 };
 
+// Login welcome back notification
+const sendLoginWelcomeBackNotification = async (userId) => {
+  try {
+    // Don't send more than once per 24 hours
+    const recent = await Notification.findOne({
+      userId,
+      type: 'login_welcome_back',
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    }).select('_id');
+
+    if (recent) return;
+
+    await createNotification(
+      userId,
+      'login_welcome_back',
+      'Welcome Back to Collegium!',
+      'Welcome back to Collegium! Make wonders by connecting with your College Buddy! 🎉',
+      {},
+      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
+    );
+  } catch (error) {
+    console.error('Error sending login welcome back notification:', error);
+  }
+};// Send promotional notification to all users (for promotions or new features)
+const sendPromotionalNotification = async (title, message, data = {}) => {
+  try {
+    const users = await User.find({ isDeleted: false });
+    const userIds = users.map(user => user._id);
+
+    if (userIds.length === 0) {
+      console.log('No active users to send promotional notification to');
+      return { sentCount: 0 };
+    }
+
+    // Send push notifications to all users
+    try {
+      await sendPushNotificationToMultiple(
+        userIds,
+        title,
+        message,
+        { ...data, type: 'promotion' }
+      );
+    } catch (pushError) {
+      console.error('Push notification failed for promotional notification:', pushError);
+    }
+
+    // Create in-app notifications for all users
+    const notifications = [];
+    for (const user of users) {
+      const notification = await createNotification(
+        user._id,
+        'promotion',
+        title,
+        message,
+        { ...data, type: 'promotion' },
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Expires in 30 days
+      );
+      notifications.push(notification);
+    }
+
+    console.log(`Sent promotional notification to ${notifications.length} users`);
+    return { sentCount: notifications.length, notifications };
+  } catch (error) {
+    console.error('Error sending promotional notification:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   createNotification,
   getUserNotifications,
@@ -398,4 +467,7 @@ module.exports = {
   sendSubscriptionUpgradeReminder,
   sendAdminCustomNotification,
   sendOfflineMessageNotification,
+  sendWelcomeNotification,
+  sendLoginWelcomeBackNotification,
+  sendPromotionalNotification,
 };

@@ -16,6 +16,7 @@ const authenticateToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    req.firebaseUid = decoded.firebaseUid; // Attach firebaseUid to request
     console.log('authenticateToken successful for user:', decoded.userId);
     next();
   } catch (error) {

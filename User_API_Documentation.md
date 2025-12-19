@@ -2,6 +2,13 @@
 
 This document lists all user API endpoints, excluding college admin and super admin APIs, including sample requests and responses.
 
+## Important Notes
+
+- **Firebase UID Integration**: All user responses now include both `_id` (MongoDB ObjectId) and `firebaseUid` (Firebase UID)
+- **Authentication**: All protected endpoints require `Authorization: Bearer <jwt_token>` header
+- **Firebase UID Usage**: Firebase UIDs are used for chat rooms, push notifications, and user-to-user interactions
+- **Backward Compatibility**: MongoDB ObjectIds are preserved for database operations
+
 ## Authentication (Users)
 
 ### POST /api/auth/signup
@@ -21,6 +28,7 @@ This document lists all user API endpoints, excluding college admin and super ad
   "message": "User created successfully",
   "user": {
     "id": "user_id",
+    "firebaseUid": "firebase_uid_here",
     "email": "john@example.com",
     "displayName": "john",
     "fullName": "John Doe",
@@ -48,6 +56,7 @@ This document lists all user API endpoints, excluding college admin and super ad
   "message": "Login successful",
   "user": {
     "id": "user_id",
+    "firebaseUid": "firebase_uid_here",
     "email": "john@example.com",
     "displayName": "john",
     "photoURL": "https://..."
@@ -66,6 +75,7 @@ This document lists all user API endpoints, excluding college admin and super ad
 {
   "user": {
     "id": "user_id",
+    "firebaseUid": "firebase_uid_here",
     "email": "john@example.com",
     "displayName": "john",
     "fullName": "John Doe",
@@ -88,6 +98,7 @@ This document lists all user API endpoints, excluding college admin and super ad
   "users": [
     {
       "id": "user_id",
+      "firebaseUid": "firebase_uid_here",
       "displayName": "john",
       "email": "john@example.com",
       "collegeName": "Example College",
@@ -504,6 +515,94 @@ image: [file]
     ],
     "status": "active"
   }
+}
+```
+
+## Notifications
+
+### GET /api/notifications
+**Description:** Get authenticated user's notifications.
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "notifications": [
+    {
+      "id": "notification_id",
+      "userId": "user_id",
+      "title": "New Like",
+      "message": "John liked your post",
+      "type": "like",
+      "data": {
+        "postId": "post_id",
+        "userId": "liker_user_id"
+      },
+      "isRead": false,
+      "createdAt": "2023-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+### PUT /api/notifications/:notificationId/read
+**Description:** Mark a specific notification as read.
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "Notification marked as read"
+}
+```
+
+### PUT /api/notifications/read-all
+**Description:** Mark all notifications as read.
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "All notifications marked as read"
+}
+```
+
+### DELETE /api/notifications/:notificationId
+**Description:** Delete a specific notification.
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "Notification deleted successfully"
+}
+```
+
+### POST /api/notifications/fcm-token
+**Description:** Update FCM token for push notifications.
+
+**Headers:** `Authorization: Bearer jwt_token`
+
+**Request Body:**
+```json
+{
+  "fcmToken": "fcm_token_here"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "FCM token updated successfully"
 }
 ```
 

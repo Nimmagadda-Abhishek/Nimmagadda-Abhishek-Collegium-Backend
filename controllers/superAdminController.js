@@ -7,6 +7,7 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const Project = require('../models/Project');
 const UserSubscription = require('../models/UserSubscription');
+const SubscriptionPlan = require('../models/SubscriptionPlan');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -289,17 +290,24 @@ const deleteCollege = async (req, res) => {
   }
 };
 
-// Send notification/update to all users (placeholder - implement email or in-app notification)
+// Send promotional notification to all users (for promotions or new features)
 const sendNotification = async (req, res) => {
   try {
-    const { message, type } = req.body; // type: 'info', 'warning', 'update'
+    const { title, message, data } = req.body;
 
-    // Placeholder: In real implementation, send emails or push notifications
-    console.log(`Sending ${type} notification: ${message}`);
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
 
-    res.status(200).json({ message: 'Notification sent successfully' });
+    const { sendPromotionalNotification } = require('../utils/notificationService');
+    const result = await sendPromotionalNotification(title, message, data || {});
+
+    res.status(200).json({
+      message: 'Promotional notification sent successfully',
+      sentCount: result.sentCount
+    });
   } catch (error) {
-    console.error('Send notification error:', error);
+    console.error('Send promotional notification error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -380,6 +388,133 @@ const deleteUserAccount = async (req, res) => {
   }
 };
 
+// Get all subscription plans
+const getSubscriptionPlans = async (req, res) => {
+  try {
+    const plans = await SubscriptionPlan.find();
+    res.status(200).json({ plans });
+  } catch (error) {
+    console.error('Get subscription plans error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Create a new subscription plan
+const createSubscriptionPlan = async (req, res) => {
+  try {
+    const {
+      name,
+      price,
+      period,
+      description,
+      features,
+      limits,
+      hasTrial,
+      trialPrice,
+      trialDays,
+      popular,
+      active
+    } = req.body;
+
+    if (!name || !price || !period || !description) {
+      return res.status(400).json({ error: 'Name, price, period, and description are required' });
+    }
+
+    // Check if plan name already exists
+    const existingPlan = await SubscriptionPlan.findOne({ name });
+    if (existingPlan) {
+      return res.status(400).json({ error: 'Subscription plan with this name already exists' });
+    }
+
+    // Create new subscription plan
+    const plan = new SubscriptionPlan({
+      name,
+      price,
+      period,
+      description,
+      features: features || [],
+      limits: limits || {},
+      hasTrial: hasTrial || false,
+      trialPrice: trialPrice || 0,
+      trialDays: trialDays || 0,
+      popular: popular || false,
+      active: active !== undefined ? active : true,
+    });
+
+    await plan.save();
+    res.status(201).json({ message: 'Subscription plan created successfully', plan });
+  } catch (error) {
+    console.error('Create subscription plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Update a subscription plan
+const updateSubscriptionPlan = async (req, res) => {
+  try {
+    const { planId } = req.params;
+    const updateData = req.body;
+
+    const plan = await SubscriptionPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ error: 'Subscription plan not found' });
+    }
+
+    // Check for name conflicts if updating name
+    if (updateData.name && updateData.name !== plan.name) {
+      const existingPlan = await SubscriptionPlan.findOne({ name: updateData.name });
+      if (existingPlan) {
+        return res.status(400).json({ error: 'Subscription plan with this name already exists' });
+      }
+    }
+
+    // Update fields
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] !== undefined) {
+        plan[key] = updateData[key];
+      }
+    });
+
+    plan.updatedAt = new Date();
+    await plan.save();
+
+    res.status(200).json({ message: 'Subscription plan updated successfully', plan });
+  } catch (error) {
+    console.error('Update subscription plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Delete a subscription plan
+const deleteSubscriptionPlan = async (req, res) => {
+  try {
+    const { planId } = req.params;
+
+    const plan = await SubscriptionPlan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ error: 'Subscription plan not found' });
+    }
+
+    // Check if plan has active subscriptions
+    const activeSubscriptions = await UserSubscription.countDocuments({
+      planId,
+      status: { $in: ['active', 'trial'] }
+    });
+
+    if (activeSubscriptions > 0) {
+      return res.status(400).json({
+        error: 'Cannot delete subscription plan with active subscriptions. Please deactivate the plan instead.'
+      });
+    }
+
+    await SubscriptionPlan.findByIdAndDelete(planId);
+    res.status(200).json({ message: 'Subscription plan deleted successfully' });
+  } catch (error) {
+    console.error('Delete subscription plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -398,4 +533,8 @@ module.exports = {
   blockUser,
   unblockUser,
   deleteUserAccount,
+  getSubscriptionPlans,
+  createSubscriptionPlan,
+  updateSubscriptionPlan,
+  deleteSubscriptionPlan,
 };

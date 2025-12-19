@@ -3,6 +3,7 @@ const {
   createPost,
   getPosts,
   getUserPosts,
+  getSinglePost,
   likePost,
   addComment,
   deletePost,
@@ -20,6 +21,9 @@ router.get('/', verifyToken, getPosts);
 
 // Get posts by a specific user
 router.get('/user/:userId', getUserPosts);
+
+// Get a single post by ID (protected)
+router.get('/:postId', verifyToken, getSinglePost);
 
 // Like or unlike a post (protected)
 router.post('/:postId/like', verifyToken, likePost);

@@ -65,10 +65,10 @@ const createOrUpdateProfile = async (req, res) => {
     const userId = req.user.userId;
     const { bio, branch, year, githubUsername, linkedinUrl } = req.body;
 
-    let profileImageUrl = req.body.profileImage; 
+    let profileImageUrl = null;
     if (req.file) {
       profileImageUrl = req.file.path;
-    } else if (req.body.profileImage && req.body.profileImage.startsWith('data:image')) {
+    } else if (req.body.profileImage && typeof req.body.profileImage === 'string' && req.body.profileImage.startsWith('data:image')) {
       try {
         const uploadedImage = await cloudinary.uploader.upload(req.body.profileImage, {
           folder: 'profiles',

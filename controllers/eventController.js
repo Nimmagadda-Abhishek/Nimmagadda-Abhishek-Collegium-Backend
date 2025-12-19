@@ -1,15 +1,37 @@
 const Event = require('../models/Event');
 const User = require('../models/User');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const { checkLimitExceeded } = require('../utils/subscriptionUtils');
 const { sendEventReminder, sendNewEventNotification } = require('../utils/notificationService');
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Configure multer with Cloudinary storage for events
+const eventStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'events', // Specify a folder in Cloudinary for event banners
+    allowed_formats: ['jpg', 'png', 'jpeg', 'gif'], // Restrict file types
+    public_id: (req, file) => Date.now().toString() + '-' + file.originalname,
+  },
+});
+
+const uploadEventBanner = multer({ storage: eventStorage });
 
 // Create a new event (only by college admin)
 const createEvent = async (req, res) => {
   try {
-    const { title, date, category, location, maxParticipants, description, banner } = req.body;
+    const { title, date, category, location, maxParticipants, description } = req.body;
 
-    if (!title || !date || !category || !location || !maxParticipants || !description || !banner) {
-      return res.status(400).json({ error: 'All fields are required' });
+    if (!title || !date || !category || !location || !maxParticipants || !description || !req.file) {
+      return res.status(400).json({ error: 'All fields are required, including banner image' });
     }
 
     // Get collegeId from admin
@@ -19,6 +41,9 @@ const createEvent = async (req, res) => {
       return res.status(404).json({ error: 'College admin not found' });
     }
 
+    // The banner URL is provided by Cloudinary in req.file.path
+    const bannerUrl = req.file.path;
+
     const event = new Event({
       title,
       date,
@@ -26,7 +51,7 @@ const createEvent = async (req, res) => {
       location,
       maxParticipants,
       description,
-      banner,
+      banner: bannerUrl,
       createdBy: req.admin.adminId, // College admin ID
       collegeId: admin.collegeId, // College ID from admin
     });
@@ -246,4 +271,5 @@ module.exports = {
   getTrendingEvents,
   searchEvents,
   updateEventStatus,
+  uploadEventBanner,
 };

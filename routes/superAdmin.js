@@ -16,7 +16,11 @@ const {
   verifySuperAdminToken,
   blockUser,
   unblockUser,
-  deleteUserAccount
+  deleteUserAccount,
+  getSubscriptionPlans,
+  createSubscriptionPlan,
+  updateSubscriptionPlan,
+  deleteSubscriptionPlan
 } = require('../controllers/superAdminController');
 
 const router = express.Router();
@@ -58,5 +62,11 @@ router.delete('/users/:userId', verifySuperAdminToken, deleteUserAccount);
 
 // Send notification route (protected)
 router.post('/notifications', verifySuperAdminToken, sendNotification);
+
+// Subscription plan management routes (protected)
+router.get('/subscription-plans', verifySuperAdminToken, getSubscriptionPlans);
+router.post('/subscription-plans', verifySuperAdminToken, createSubscriptionPlan);
+router.put('/subscription-plans/:planId', verifySuperAdminToken, updateSubscriptionPlan);
+router.delete('/subscription-plans/:planId', verifySuperAdminToken, deleteSubscriptionPlan);
 
 module.exports = router;

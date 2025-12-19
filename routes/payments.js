@@ -1,18 +1,15 @@
 const express = require('express');
-const { createOrder, verifyPayment, handleWebhook } = require('../controllers/paymentController');
-const { verifyToken } = require('../controllers/authController');
-
 const router = express.Router();
+const paymentController = require('../controllers/paymentController');
+const { authenticateToken } = require('../middleware/auth');
 
-// ====================
-// 🔒 Protected Routes
-// ====================
-router.post('/create-order', verifyToken, createOrder);
-router.post('/verify', verifyToken, verifyPayment);
+// Create payment order (requires auth)
+router.post('/create-order', authenticateToken, paymentController.createOrder);
 
-// ====================
-// 🪝 Webhook Route (No auth needed, but verify signature)
-// ====================
-router.post('/webhook', handleWebhook);
+// Verify payment (requires auth)
+router.post('/verify', authenticateToken, paymentController.verifyPayment);
+
+// Handle Razorpay webhook (no auth required)
+router.post('/webhook', paymentController.handleWebhook);
 
 module.exports = router;

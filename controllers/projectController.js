@@ -325,12 +325,13 @@ const removeCollaborator = async (req, res) => {
   }
 };
 
-// Get a single project by ID
+// Get a single project by ID (only owner and collaborators)
 const getProject = async (req, res) => {
-  console.log('Get project API called for project:', req.params.projectId);
+  console.log('Get project API called for project:', req.params.projectId, 'by user:', req.user.userId);
 
   try {
     const { projectId } = req.params;
+    const userId = req.user.userId;
 
     const project = await Project.findById(projectId)
       .populate('user', 'displayName photoURL')
@@ -341,6 +342,14 @@ const getProject = async (req, res) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
+    const isOwner = project.user._id.toString() === userId;
+    const isCollaborator = project.collaborators.some(collab => collab._id.toString() === userId);
+
+    if (!isOwner && !isCollaborator) {
+      console.error('Get project failed: User', userId, 'not authorized to view project', projectId);
+      return res.status(403).json({ error: 'Access denied. Only project owner and collaborators can view this project' });
+    }
+
     console.log('Get project successful for ID:', projectId);
     res.status(200).json({ project });
   } catch (error) {
@@ -348,7 +357,8 @@ const getProject = async (req, res) => {
       message: error.message,
       stack: error.stack,
       name: error.name,
-      projectId: req.params?.projectId
+      projectId: req.params?.projectId,
+      userId: req.user?.userId
     });
     res.status(500).json({ error: 'Internal server error' });
   }

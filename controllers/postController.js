@@ -1,10 +1,12 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
+const Profile = require('../models/Profile');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const { checkLimitExceeded } = require('../utils/subscriptionUtils');
-const { sendPostLikeNotification, sendPostCommentNotification } = require('../utils/notificationService');
+const { sendPostCommentNotification } = require('../utils/notificationService');
+const { NotificationHelpers } = require('../utils/notificationHelpers');
 
 // Configure Cloudinary
 cloudinary.config({
@@ -104,8 +106,30 @@ const getPosts = async (req, res) => {
       .populate('comments.user', 'displayName')
       .sort({ createdAt: -1 }); // Most recent first
 
-    console.log('Get posts successful, returned', posts.length, 'posts');
-    res.status(200).json({ posts });
+    // Fetch associated profiles for post users
+    const userIds = posts.map(post => post.user._id);
+    const profiles = await Profile.find({ user: { $in: userIds } }).select('user profileImage');
+
+    // Create a map of userId to profile for easy lookup
+    const profileMap = {};
+    profiles.forEach(profile => {
+      profileMap[profile.user.toString()] = profile;
+    });
+
+    // Merge profile data into posts' user objects
+    const postsWithProfiles = posts.map(post => {
+      const postObj = post.toObject();
+      const profile = profileMap[post.user._id.toString()];
+      if (profile) {
+        postObj.user.profileImage = profile.profileImage;
+      } else {
+        postObj.user.profileImage = null; // No profile exists
+      }
+      return postObj;
+    });
+
+    console.log('Get posts successful, returned', postsWithProfiles.length, 'posts');
+    res.status(200).json({ posts: postsWithProfiles });
   } catch (error) {
     console.error('Get posts error occurred:', {
       message: error.message,
@@ -137,6 +161,52 @@ const getUserPosts = async (req, res) => {
       stack: error.stack,
       name: error.name,
       userId: req.params?.userId
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get a single post by ID
+const getSinglePost = async (req, res) => {
+  console.log('Get single post API called for post:', req.params.postId);
+
+  try {
+    const { postId } = req.params;
+    const currentUser = await User.findById(req.user.userId);
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const post = await Post.findOne({
+      _id: postId,
+      collegeId: req.user.collegeId,
+      user: { $nin: [...currentUser.blockedUsers, ...await User.find({ isDeleted: true }).distinct('_id')] }
+    })
+      .populate('user', 'displayName photoURL')
+      .populate('likes', 'displayName')
+      .populate('comments.user', 'displayName');
+
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    // Fetch associated profile for post user
+    const profile = await Profile.findOne({ user: post.user._id }).select('user profileImage');
+    const postObj = post.toObject();
+    if (profile) {
+      postObj.user.profileImage = profile.profileImage;
+    } else {
+      postObj.user.profileImage = null;
+    }
+
+    console.log('Get single post successful for post:', postId);
+    res.status(200).json({ post: postObj });
+  } catch (error) {
+    console.error('Get single post error occurred:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      postId: req.params?.postId
     });
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -287,6 +357,7 @@ module.exports = {
   createPost,
   getPosts,
   getUserPosts,
+  getSinglePost,
   likePost,
   addComment,
   deletePost,
