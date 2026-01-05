@@ -55,6 +55,11 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/company/subscriptions', companySubscriptionRoutes);
 app.use('/api/company/payments', companyPaymentRoutes);
 
+// Health check route
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
