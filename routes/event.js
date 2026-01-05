@@ -1,5 +1,5 @@
 const express = require('express');
-const { createEvent, registerForEvent, getEvents, getEventById, adminViewRegistrations, getAdminEvents, likeEvent, getTrendingEvents, searchEvents, updateEventStatus, uploadEventBanner } = require('../controllers/eventController');
+const { createEvent, registerForEvent, getEvents, getEventById, adminViewRegistrations, getAdminEvents, likeEvent, getTrendingEvents, searchEvents, updateEventStatus, uploadEventBanner, getUserRegistrations, verifyUserRegistration } = require('../controllers/eventController');
 const { verifyToken } = require('../controllers/authController');
 const { verifyCollegeAdminToken } = require('../controllers/collegeAdminController');
 
@@ -14,11 +14,17 @@ router.post('/register/:eventId', verifyToken, registerForEvent);
 // Get all events (protected)
 router.get('/', verifyToken, getEvents);
 
-// Get trending events (protected)
+// Get available events (trending)
 router.get('/trending', verifyToken, getTrendingEvents);
 
-// Search events by title and date (protected)
+// Search events
 router.get('/search', verifyToken, searchEvents);
+
+// Get user's registered events (Must be before /:eventId)
+router.get('/my-registrations', verifyToken, getUserRegistrations);
+
+// Verify specific registration
+router.get('/my-registrations/:eventId', verifyToken, verifyUserRegistration);
 
 // Get a single event by ID (protected)
 router.get('/:eventId', verifyToken, getEventById);

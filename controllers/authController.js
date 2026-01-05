@@ -9,13 +9,37 @@ const JWT_SECRET = process.env.JWT_SECRET;
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
   try {
-    // Use the service account JSON file path from environment variable
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH || './collegium-e1d79-firebase-adminsdk-fbsvc-ab69ff0e8a.json';
-    const serviceAccount = require(serviceAccountPath);
+    // Use environment variables for Firebase configuration
+    let serviceAccount;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH) {
+      try {
+        const path = require('path');
+        serviceAccount = require(path.resolve(__dirname, '..', process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH));
+        console.log('Loaded Firebase service account from file:', process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH);
+      } catch (error) {
+        console.error('Error loading service account from file, falling back to env vars:', error.message);
+      }
+    }
+
+    if (!serviceAccount) {
+      serviceAccount = {
+        type: "service_account",
+        project_id: process.env.FIREBASE_PROJECT_ID,
+        private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+        private_key: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
+        client_email: process.env.FIREBASE_CLIENT_EMAIL,
+        client_id: process.env.FIREBASE_CLIENT_ID,
+        auth_uri: process.env.FIREBASE_AUTH_URI,
+        token_uri: process.env.FIREBASE_TOKEN_URI,
+        auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+        client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL
+      };
+    }
 
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
+    console.log('Firebase Admin SDK initialized successfully');
   } catch (error) {
     console.error('Firebase initialization failed:', error.message);
     console.log('Continuing without Firebase. Auth endpoints will not work.');
@@ -222,6 +246,8 @@ const getProfile = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    const profile = await Profile.findOne({ user: req.user.userId }).select('profileImage bio branch year githubProfile linkedinProfile');
+
     console.log('Get profile successful for user:', user._id);
     res.status(200).json({
       user: {
@@ -234,6 +260,7 @@ const getProfile = async (req, res) => {
         photoURL: user.photoURL,
         createdAt: user.createdAt,
         lastLogin: user.lastLogin,
+        profile: profile || null,
       },
     });
   } catch (error) {

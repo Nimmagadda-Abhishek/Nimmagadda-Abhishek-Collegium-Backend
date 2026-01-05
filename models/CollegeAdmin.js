@@ -15,6 +15,17 @@ const collegeAdminSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  firebaseUid: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  otp: {
+    type: String,
+  },
+  otpExpires: {
+    type: Date,
+  },
   isApproved: {
     type: Boolean,
     default: false,

@@ -1,8 +1,8 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const Payment = require('../models/Payment');
-const UserSubscription = require('../models/UserSubscription');
-const SubscriptionPlan = require('../models/SubscriptionPlan');
+const CompanyPayment = require('../models/CompanyPayment');
+const CompanySubscription = require('../models/CompanySubscription');
+const CompanySubscriptionPlan = require('../models/CompanySubscriptionPlan');
 
 // ====================
 // 🔧 Razorpay Configuration
@@ -13,33 +13,42 @@ const razorpay = new Razorpay({
 });
 
 // ====================
-// 💰 Create Payment Order
+// 💰 Create Payment Order for Company
 // ====================
-const createOrder = async (req, res) => {
+// ====================
+// 💰 Create Payment Order for Company
+// ====================
+const createCompanyOrder = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { planId, isTrial = false } = req.body;
+    const companyId = req.company.companyId;
+    const { planId } = req.body;
 
-    const plan = await SubscriptionPlan.findById(planId);
+    console.log(`[CreateOrder] Company: ${companyId}, Plan: ${planId}`);
+
+    const plan = await CompanySubscriptionPlan.findById(planId);
     if (!plan) {
+      console.log(`[CreateOrder] Plan not found: ${planId}`);
       return res.status(404).json({ error: 'Plan not found' });
     }
 
-    const amount = isTrial ? plan.trialPrice : plan.price;
+    const amount = plan.price;
     const amountInPaise = amount * 100; // Razorpay expects amount in paise
+
+    console.log(`[CreateOrder] Creating Razorpay order for amount: ${amountInPaise}`);
 
     const options = {
       amount: amountInPaise,
       currency: 'INR',
-      receipt: `rcpt_${userId.toString().slice(-10)}_${Date.now().toString().slice(-8)}`,
+      receipt: `rcpt_${companyId.toString().slice(-8)}_${Date.now().toString().slice(-8)}`,
       payment_capture: 1, // Auto capture
     };
 
     const order = await razorpay.orders.create(options);
+    console.log(`[CreateOrder] Razorpay order created: ${order.id}`);
 
     // Create payment record
-    const payment = new Payment({
-      userId,
+    const payment = new CompanyPayment({
+      companyId,
       subscriptionId: null, // Will be updated after subscription creation
       amount,
       paymentMethod: 'razorpay',
@@ -48,6 +57,7 @@ const createOrder = async (req, res) => {
     });
 
     await payment.save();
+    console.log(`[CreateOrder] Payment record saved: ${payment._id}`);
 
     res.status(200).json({
       success: true,
@@ -56,7 +66,7 @@ const createOrder = async (req, res) => {
       key: process.env.RAZORPAY_KEY_ID,
     });
   } catch (error) {
-    console.error('❌ Create order error:', error);
+    console.error('❌ Create company order error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -66,12 +76,12 @@ const createOrder = async (req, res) => {
 };
 
 // ====================
-// ✅ Verify Payment
+// ✅ Verify Company Payment
 // ====================
-const verifyPayment = async (req, res) => {
+const verifyCompanyPayment = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, paymentId, planId, isTrial = false } = req.body;
-    const userId = req.user.userId;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, paymentId, planId } = req.body;
+    const companyId = req.company.companyId;
 
     // Verify signature
     const sign = razorpay_order_id + '|' + razorpay_payment_id;
@@ -85,7 +95,7 @@ const verifyPayment = async (req, res) => {
     }
 
     // Update payment status
-    const payment = await Payment.findOne({ gatewayOrderId: razorpay_order_id });
+    const payment = await CompanyPayment.findById(paymentId);
     if (!payment) {
       return res.status(404).json({ error: 'Payment record not found' });
     }
@@ -95,48 +105,24 @@ const verifyPayment = async (req, res) => {
     payment.completedAt = new Date();
     await payment.save();
 
-    // Create or update subscription
-    let subscription;
-    if (isTrial) {
-      // For trial conversion
-      subscription = await UserSubscription.findOne({ userId, status: 'trial' });
-      if (subscription) {
-        subscription.status = 'active';
-        let endDate = new Date();
-        const plan = await SubscriptionPlan.findById(planId);
-        if (plan.period === 'month') {
-          endDate.setMonth(endDate.getMonth() + 1);
-        } else {
-          endDate.setFullYear(endDate.getFullYear() + 1);
-        }
-        subscription.endDate = endDate;
-        subscription.updatedAt = new Date();
-        await subscription.save();
-      }
-    } else {
-      // New subscription
-      const plan = await SubscriptionPlan.findById(planId);
-      const startDate = new Date();
-      let endDate = new Date(startDate);
-      if (plan.period === 'month') {
-        endDate.setMonth(endDate.getMonth() + 1);
-      } else {
-        endDate.setFullYear(endDate.getFullYear() + 1);
-      }
+    // Create subscription
+    const plan = await CompanySubscriptionPlan.findById(planId);
+    const startDate = new Date();
+    let endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1); // Monthly subscription
 
-      subscription = new UserSubscription({
-        userId,
-        planId,
-        status: 'active',
-        startDate,
-        endDate,
-        paymentMethod: 'razorpay',
-        lastPaymentDate: new Date(),
-        nextBillingDate: endDate,
-      });
+    const subscription = new CompanySubscription({
+      companyId,
+      planId,
+      status: 'active',
+      startDate,
+      endDate,
+      paymentMethod: 'razorpay',
+      lastPaymentDate: new Date(),
+      nextBillingDate: endDate,
+    });
 
-      await subscription.save();
-    }
+    await subscription.save();
 
     // Update payment with subscription ID
     payment.subscriptionId = subscription._id;
@@ -149,7 +135,7 @@ const verifyPayment = async (req, res) => {
       payment,
     });
   } catch (error) {
-    console.error('❌ Verify payment error:', error);
+    console.error('❌ Verify company payment error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -159,9 +145,9 @@ const verifyPayment = async (req, res) => {
 };
 
 // ====================
-// 🪝 Handle Razorpay Webhook
+// 🪝 Handle Company Razorpay Webhook
 // ====================
-const handleWebhook = async (req, res) => {
+const handleCompanyWebhook = async (req, res) => {
   try {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
     const signature = req.headers['x-razorpay-signature'];
@@ -181,7 +167,7 @@ const handleWebhook = async (req, res) => {
 
     if (event === 'payment.captured') {
       // Payment was successfully captured
-      const payment = await Payment.findOne({ gatewayPaymentId: paymentEntity.id });
+      const payment = await CompanyPayment.findOne({ gatewayPaymentId: paymentEntity.id });
       if (payment && payment.status !== 'completed') {
         payment.status = 'completed';
         payment.completedAt = new Date();
@@ -189,7 +175,7 @@ const handleWebhook = async (req, res) => {
 
         // Update subscription status if needed
         if (payment.subscriptionId) {
-          await UserSubscription.findByIdAndUpdate(payment.subscriptionId, {
+          await CompanySubscription.findByIdAndUpdate(payment.subscriptionId, {
             status: 'active',
             lastPaymentDate: new Date(),
           });
@@ -197,7 +183,7 @@ const handleWebhook = async (req, res) => {
       }
     } else if (event === 'payment.failed') {
       // Payment failed
-      const payment = await Payment.findOne({ gatewayOrderId: paymentEntity.order_id });
+      const payment = await CompanyPayment.findOne({ gatewayOrderId: paymentEntity.order_id });
       if (payment) {
         payment.status = 'failed';
         await payment.save();
@@ -206,7 +192,36 @@ const handleWebhook = async (req, res) => {
 
     res.status(200).json({ status: 'ok' });
   } catch (error) {
-    console.error('❌ Webhook error:', error);
+    console.error('❌ Company webhook error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      details: error.message,
+    });
+  }
+};
+
+// ====================
+// 📊 Get Company Subscription Status
+// ====================
+const getCompanySubscription = async (req, res) => {
+  try {
+    const companyId = req.company.companyId;
+
+    const subscription = await CompanySubscription.findOne({ companyId, status: 'active' })
+      .populate('planId')
+      .sort({ createdAt: -1 });
+
+    if (!subscription) {
+      return res.status(404).json({ error: 'No active subscription found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      subscription,
+    });
+  } catch (error) {
+    console.error('❌ Get company subscription error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',
@@ -219,7 +234,8 @@ const handleWebhook = async (req, res) => {
 // 🚀 Export
 // ====================
 module.exports = {
-  createOrder,
-  verifyPayment,
-  handleWebhook,
+  createCompanyOrder,
+  verifyCompanyPayment,
+  handleCompanyWebhook,
+  getCompanySubscription,
 };

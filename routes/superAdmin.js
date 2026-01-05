@@ -20,8 +20,19 @@ const {
   getSubscriptionPlans,
   createSubscriptionPlan,
   updateSubscriptionPlan,
-  deleteSubscriptionPlan
+  deleteSubscriptionPlan,
+  getCompanies,
+  getCompanyById,
+  approveCompany,
+  verifyCompany,
+  deleteCompany
 } = require('../controllers/superAdminController');
+const {
+  getAllPlans: getAllCompanyPlans,
+  createPlan: createCompanyPlan,
+  updatePlan: updateCompanyPlan,
+  deletePlan: deleteCompanyPlan
+} = require('../controllers/companySubscriptionController');
 
 const router = express.Router();
 
@@ -36,6 +47,13 @@ router.get('/college-admins', verifySuperAdminToken, getCollegeAdmins);
 
 // Approve/reject college admin route (protected)
 router.put('/college-admins/:adminId/approve', verifySuperAdminToken, approveCollegeAdmin);
+
+// Company management routes (protected)
+router.get('/companies', verifySuperAdminToken, getCompanies);
+router.get('/companies/:companyId', verifySuperAdminToken, getCompanyById);
+router.put('/companies/:companyId/approve', verifySuperAdminToken, approveCompany);
+router.put('/companies/:companyId/verify', verifySuperAdminToken, verifyCompany);
+router.delete('/companies/:companyId', verifySuperAdminToken, deleteCompany);
 
 // Get all users route (protected)
 router.get('/users', verifySuperAdminToken, getAllUsers);
@@ -68,5 +86,11 @@ router.get('/subscription-plans', verifySuperAdminToken, getSubscriptionPlans);
 router.post('/subscription-plans', verifySuperAdminToken, createSubscriptionPlan);
 router.put('/subscription-plans/:planId', verifySuperAdminToken, updateSubscriptionPlan);
 router.delete('/subscription-plans/:planId', verifySuperAdminToken, deleteSubscriptionPlan);
+
+// Company Subscription plan management routes (protected)
+router.get('/company-subscription-plans', verifySuperAdminToken, getAllCompanyPlans);
+router.post('/company-subscription-plans', verifySuperAdminToken, createCompanyPlan);
+router.put('/company-subscription-plans/:planId', verifySuperAdminToken, updateCompanyPlan);
+router.delete('/company-subscription-plans/:planId', verifySuperAdminToken, deleteCompanyPlan);
 
 module.exports = router;

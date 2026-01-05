@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const User = require('../models/User');
 const multer = require('multer');
@@ -31,7 +32,22 @@ const createEvent = async (req, res) => {
     const { title, date, category, location, maxParticipants, description } = req.body;
 
     if (!title || !date || !category || !location || !maxParticipants || !description || !req.file) {
-      return res.status(400).json({ error: 'All fields are required, including banner image' });
+      const missingFields = [];
+      if (!title) missingFields.push('title');
+      if (!date) missingFields.push('date');
+      if (!category) missingFields.push('category');
+      if (!location) missingFields.push('location');
+      if (!maxParticipants) missingFields.push('maxParticipants');
+      if (!description) missingFields.push('description');
+      if (!req.file) missingFields.push('banner (image file)');
+
+      console.log('Create Event Failed - Missing Fields:', missingFields);
+
+      return res.status(400).json({
+        error: 'Validation failed',
+        missingFields: missingFields,
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      });
     }
 
     // Get collegeId from admin
@@ -72,6 +88,11 @@ const createEvent = async (req, res) => {
 const registerForEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
+
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: 'Invalid event ID' });
+    }
+
     const userId = req.user.userId;
 
     const event = await Event.findById(eventId);
@@ -119,6 +140,9 @@ const getEvents = async (req, res) => {
 const getEventById = async (req, res) => {
   try {
     const { eventId } = req.params;
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: 'Invalid event ID' });
+    }
     const event = await Event.findById(eventId).populate('createdBy', 'displayName email').populate('registrations', 'displayName email');
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
@@ -134,6 +158,11 @@ const getEventById = async (req, res) => {
 const adminViewRegistrations = async (req, res) => {
   try {
     const { eventId } = req.params;
+
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: 'Invalid event ID' });
+    }
+
     const event = await Event.findById(eventId).populate('registrations', 'displayName email fullName collegeName');
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
@@ -163,6 +192,10 @@ const likeEvent = async (req, res) => {
   try {
     const { eventId } = req.params;
     const userId = req.user.userId;
+
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: 'Invalid event ID' });
+    }
 
     const event = await Event.findById(eventId);
     if (!event) {
@@ -238,6 +271,11 @@ const searchEvents = async (req, res) => {
 const updateEventStatus = async (req, res) => {
   try {
     const { eventId } = req.params;
+
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ error: 'Invalid event ID' });
+    }
+
     const { status } = req.body;
     const adminId = req.admin.adminId;
 
@@ -260,6 +298,84 @@ const updateEventStatus = async (req, res) => {
   }
 };
 
+// Get user's registered events
+const getUserRegistrations = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Find events where registrations array contains an object with userId
+    const events = await Event.find({
+      'registrations.userId': userId,
+    })
+      .populate('createdBy', 'displayName email')
+      .select('title date category location description banner status registrations.$'); // Select specific fields and matching registration
+
+    if (!events) {
+      return res.status(200).json({ registrations: [] });
+    }
+
+    // Transform response to include registration details nicely
+    const registrations = events.map(event => ({
+      eventId: event._id,
+      title: event.title,
+      date: event.date,
+      location: event.location,
+      banner: event.banner,
+      status: event.status,
+      registeredAt: event.registrations[0].registeredAt, // The $ projection returns only the matching element
+    }));
+
+    res.status(200).json({ registrations });
+  } catch (error) {
+    console.error('Get user registrations error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Verify specific event registration
+const verifyUserRegistration = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user.userId;
+
+    if (!eventId || !mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ isRegistered: false, message: 'Invalid event ID' });
+    }
+
+    const event = await Event.findOne({
+      _id: eventId,
+      'registrations.userId': userId
+    }).populate('createdBy', 'displayName');
+
+    if (!event) {
+      return res.status(404).json({
+        isRegistered: false,
+        message: 'Registration not found for this event'
+      });
+    }
+
+    // Find specific registration details
+    const registration = event.registrations.find(r => r.userId.toString() === userId);
+
+    res.status(200).json({
+      isRegistered: true,
+      registeredAt: registration.registeredAt,
+      event: {
+        id: event._id,
+        title: event.title,
+        date: event.date,
+        location: event.location,
+        banner: event.banner,
+        organizedBy: event.createdBy.displayName
+      }
+    });
+
+  } catch (error) {
+    console.error('Verify registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   createEvent,
   registerForEvent,
@@ -272,4 +388,6 @@ module.exports = {
   searchEvents,
   updateEventStatus,
   uploadEventBanner,
+  getUserRegistrations,
+  verifyUserRegistration,
 };

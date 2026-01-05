@@ -399,27 +399,428 @@ Super admin endpoints require JWT token from super admin login. Include the toke
   }
   ```
 
-### Notification Endpoints
+### User Management Endpoints
 
-#### 13. Send Notification
+#### 13. Block User
 - **Method**: POST
-- **Path**: `/notifications`
-- **Description**: Sends a system-wide notification to all users (placeholder implementation - currently logs to console, should be extended to email/push notifications).
+- **Path**: `/users/:userId/block`
+- **Description**: Blocks a user account (super admin action). Blocked users cannot access the platform.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `userId` (path parameter)
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "User blocked by super admin successfully"
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 14. Unblock User
+- **Method**: POST
+- **Path**: `/users/:userId/unblock`
+- **Description**: Unblocks a previously blocked user account.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `userId` (path parameter)
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "User unblocked by super admin successfully"
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 15. Delete User Account
+- **Method**: DELETE
+- **Path**: `/users/:userId`
+- **Description**: Soft deletes a user account. The user data is retained but marked as deleted.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `userId` (path parameter)
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "User account deleted successfully"
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+### Subscription Plan Management Endpoints
+
+#### 16. Get All Subscription Plans
+- **Method**: GET
+- **Path**: `/subscription-plans`
+- **Description**: Retrieves all subscription plans in the system.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Response** (Success - 200):
+  ```json
+  {
+    "plans": [
+      {
+        "name": "string",
+        "price": "number",
+        "period": "month|year",
+        "description": "string",
+        "features": ["string"],
+        "limits": {
+          "chats": "number",
+          "projects": "number",
+          "events": "number",
+          "resources": "number"
+        },
+        "hasTrial": "boolean",
+        "trialPrice": "number",
+        "trialDays": "number",
+        "popular": "boolean",
+        "active": "boolean",
+        "_id": "string",
+        "createdAt": "date",
+        "updatedAt": "date"
+      }
+    ]
+  }
+  ```
+- **Response** (Error - 500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 17. Create Subscription Plan
+- **Method**: POST
+- **Path**: `/subscription-plans`
+- **Description**: Creates a new subscription plan.
 - **Headers**: `Authorization: Bearer <super-admin-token>`
 - **Request Body**:
   ```json
   {
-    "message": "string",
-    "type": "info|warning|update"
+    "name": "string",
+    "price": "number",
+    "period": "month|year",
+    "description": "string",
+    "features": ["string"],
+    "limits": {
+      "chats": "number",
+      "projects": "number",
+      "events": "number",
+      "resources": "number"
+    },
+    "hasTrial": "boolean",
+    "trialPrice": "number",
+    "trialDays": "number",
+    "popular": "boolean",
+    "active": "boolean"
+  }
+  ```
+- **Response** (Success - 201):
+  ```json
+  {
+    "message": "Subscription plan created successfully",
+    "plan": {
+      // Plan object
+    }
+  }
+  ```
+- **Response** (Error - 400/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 18. Update Subscription Plan
+- **Method**: PUT
+- **Path**: `/subscription-plans/:planId`
+- **Description**: Updates an existing subscription plan.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `planId` (path parameter)
+- **Request Body**: (same as create, all fields optional)
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "Subscription plan updated successfully",
+    "plan": {
+      // Updated plan object
+    }
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 19. Delete Subscription Plan
+- **Method**: DELETE
+- **Path**: `/subscription-plans/:planId`
+- **Description**: Deletes a subscription plan (only if no active subscriptions exist).
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `planId` (path parameter)
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "Subscription plan deleted successfully"
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+### Company Management Endpoints
+
+#### 20. Get All Companies
+- **Method**: GET
+- **Path**: `/companies`
+- **Description**: Retrieves all companies (pending and approved) in the system.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Response** (Success - 200):
+  ```json
+  {
+    "companies": [
+      {
+        "companyName": "string",
+        "contactName": "string",
+        "email": "string",
+        "phone": "string",
+        "isApproved": "boolean",
+        "isVerified": "boolean",
+        "_id": "string",
+        "createdAt": "date"
+      }
+    ]
+  }
+  ```
+  {
+    "error": "string"
+  }
+  ```
+
+#### 21. Get Company by ID
+- **Method**: GET
+- **Path**: `/companies/:companyId`
+- **Description**: Retrieves detailed information about a specific company, including onboarding documents.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `companyId` (path parameter)
+- **Response** (Success - 200):
+  ```json
+  {
+    "company": {
+      "companyName": "string",
+      "contactName": "string",
+      "email": "string",
+      "phone": "string",
+      "website": "string",
+      "natureOfWork": "string",
+      "yearOfIncorporation": "number",
+      "registrationNumber": "string",
+      "registeredAddress": "string",
+      "city": "string",
+      "state": "string",
+      "country": "string",
+      "pincode": "string",
+      "certificateOfIncorporation": "string (url)",
+      "gstCertificate": "string (url)",
+      "companyIdProof": "string (url)",
+      "authorizedSignatoryIdProof": "string (url)",
+      "isApproved": "boolean",
+      "isVerified": "boolean",
+      "_id": "string",
+      "createdAt": "date"
+    }
+  }
+  ```
+- **Response** (Error - 404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 22. Approve/Reject Company
+- **Method**: PUT
+- **Path**: `/companies/:companyId/approve`
+- **Description**: Approves or rejects a company registration.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `companyId` (path parameter)
+- **Request Body**:
+  ```json
+  {
+    "isApproved": "boolean"
   }
   ```
 - **Response** (Success - 200):
   ```json
   {
-    "message": "Notification sent successfully"
+    "message": "Company approved/rejected successfully",
+    "company": {
+      // Company object
+    }
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+### Company Subscription Plan Management Endpoints
+
+#### 23. Get All Company Subscription Plans
+- **Method**: GET
+- **Path**: `/company-subscription-plans`
+- **Description**: Retrieves all company subscription plans in the system.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Response** (Success - 200):
+  ```json
+  {
+    "plans": [
+      {
+        "name": "string",
+        "price": "number",
+        "duration": "monthly|yearly",
+        "description": "string",
+        "features": {
+          "hiringPosts": "number",
+          "support": "string",
+          "visibility": "string",
+          "analytics": "boolean",
+          "customBranding": "boolean"
+        },
+        "isActive": "boolean",
+        "_id": "string",
+        "createdAt": "date",
+        "updatedAt": "date"
+      }
+    ]
   }
   ```
 - **Response** (Error - 500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 24. Create Company Subscription Plan
+- **Method**: POST
+- **Path**: `/company-subscription-plans`
+- **Description**: Creates a new company subscription plan.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Request Body**:
+  ```json
+  {
+    "name": "string",
+    "price": "number",
+    "duration": "string",
+    "features": {
+       "hiringPosts": "number",
+       "support": "string",
+       "visibility": "string",
+       "analytics": "boolean",
+       "customBranding": "boolean"
+    }
+  }
+  ```
+- **Response** (Success - 201):
+  ```json
+  {
+    "message": "Company subscription plan created successfully",
+    "plan": {
+      // Plan object
+    }
+  }
+  ```
+- **Response** (Error - 400/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 25. Update Company Subscription Plan
+- **Method**: PUT
+- **Path**: `/company-subscription-plans/:planId`
+- **Description**: Updates an existing company subscription plan.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `planId` (path parameter)
+- **Request Body**: (same as create, all fields optional)
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "Company subscription plan updated successfully",
+    "plan": {
+      // Updated plan object
+    }
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+#### 26. Delete Company Subscription Plan
+- **Method**: DELETE
+- **Path**: `/company-subscription-plans/:planId`
+- **Description**: Deactivated a company subscription plan (soft delete).
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Parameters**: `planId` (path parameter)
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "Company subscription plan deactivated successfully"
+  }
+  ```
+- **Response** (Error - 400/404/500):
+  ```json
+  {
+    "error": "string"
+  }
+  ```
+
+### Notification Endpoints
+
+#### 22. Send Notification
+- **Method**: POST
+- **Path**: `/notifications`
+- **Description**: Sends a promotional notification to all users.
+- **Headers**: `Authorization: Bearer <super-admin-token>`
+- **Request Body**:
+  ```json
+  {
+    "title": "string",
+    "message": "string",
+    "data": "object (optional)"
+  }
+  ```
+- **Response** (Success - 200):
+  ```json
+  {
+    "message": "Promotional notification sent successfully",
+    "sentCount": "number"
+  }
+  ```
+- **Response** (Error - 400/500):
   ```json
   {
     "error": "string"

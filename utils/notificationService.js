@@ -135,6 +135,14 @@ const sendEventReminder = async (eventId) => {
         { eventId: event._id, eventDate: event.date },
         new Date(event.date.getTime() + 24 * 60 * 60 * 1000) // Expires 1 day after event
       );
+
+      // Send push notification
+      await sendPushNotification(
+        registration.userId._id,
+        'Event Reminder',
+        `Don't forget! The event "${event.title}" is happening in 2 days.`,
+        { type: 'event_reminder', eventId: event._id.toString() }
+      );
     }
   } catch (error) {
     console.error('Error sending event reminders:', error);
@@ -155,8 +163,8 @@ const sendNewEventNotification = async (eventId) => {
       await sendPushNotificationToMultiple(
         userIds,
         'New Event Posted',
-        `${event.createdBy.displayName} posted a new event: "${event.title}" on ${event.date.toDateString()}.`,
-        { eventId: event._id.toString(), eventDate: event.date.toISOString() }
+        `College Admin posted a new event: "${event.title}" on ${event.date.toDateString()}.`,
+        { eventId: event._id.toString(), eventDate: event.date.toISOString(), type: 'new_event' }
       );
     } catch (pushError) {
       console.error('Push notification failed for new event:', pushError);
@@ -168,7 +176,7 @@ const sendNewEventNotification = async (eventId) => {
         user._id,
         'new_event',
         'New Event Posted',
-        `${event.createdBy.displayName} posted a new event: "${event.title}" on ${event.date.toDateString()}.`,
+        `College Admin posted a new event: "${event.title}" on ${event.date.toDateString()}.`,
         { eventId: event._id, eventDate: event.date },
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Expires in 7 days
         false // Don't send push again
@@ -197,6 +205,14 @@ const sendPostLikeNotification = async (postId, likerId) => {
       { postId, likerId },
       new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Expires in 30 days
     );
+
+    // Send push notification
+    await sendPushNotification(
+      post.user._id,
+      'Post Liked',
+      `${liker.displayName} liked your post.`,
+      { type: 'post_like', postId: postId.toString(), likerId: likerId.toString() }
+    );
   } catch (error) {
     console.error('Error sending post like notification:', error);
   }
@@ -219,6 +235,14 @@ const sendPostCommentNotification = async (postId, commenterId, commentText) => 
       `${commenter.displayName} commented on your post: "${commentText.substring(0, 50)}${commentText.length > 50 ? '...' : ''}"`,
       { postId, commenterId, commentText },
       new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Expires in 30 days
+    );
+
+    // Send push notification
+    await sendPushNotification(
+      post.user._id,
+      'New Comment',
+      `${commenter.displayName} commented on your post: "${commentText.substring(0, 50)}${commentText.length > 50 ? '...' : ''}"`,
+      { type: 'post_comment', postId: postId.toString(), commenterId: commenterId.toString() }
     );
   } catch (error) {
     console.error('Error sending post comment notification:', error);
@@ -341,6 +365,10 @@ const sendAdminCustomNotification = async (userIds, title, message, data = {}) =
       );
       notifications.push(notification);
     }
+
+    // Send push notification to all users
+    await sendPushNotificationToMultiple(userIds, title, message, { ...data, type: 'admin_custom' });
+
     return notifications;
   } catch (error) {
     console.error('Error sending admin custom notifications:', error);
@@ -362,6 +390,14 @@ const sendOfflineMessageNotification = async (receiverId, senderId, message) => 
       { senderId, message },
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Expires in 7 days
     );
+
+    // Send push notification
+    await sendPushNotification(
+      receiverId,
+      'New Message',
+      `${sender.displayName} sent you a message while you were offline: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`,
+      { type: 'message_offline', senderId: senderId.toString() }
+    );
   } catch (error) {
     console.error('Error sending offline message notification:', error);
   }
@@ -377,6 +413,14 @@ const sendWelcomeNotification = async (userId) => {
       'Welcome to Collegium! 🎉 Explore events, connect with peers, and make the most of your college experience.',
       {},
       new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Expires in 30 days
+    );
+
+    // Send push notification
+    await sendPushNotification(
+      userId,
+      'Welcome to Collegium!',
+      'Welcome to Collegium! 🎉 Explore events, connect with peers, and make the most of your college experience.',
+      { type: 'welcome' }
     );
   } catch (error) {
     console.error('Error sending welcome notification:', error);

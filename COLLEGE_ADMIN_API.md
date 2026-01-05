@@ -1,406 +1,469 @@
 # College Admin API Documentation
 
-This document provides a comprehensive overview of the college admin-specific API endpoints, including their HTTP methods, request/response data, and descriptions. These endpoints are restricted to approved college admins and require appropriate authentication. College admins have administrative control over their college's events, user management, and related data.
+## Overview
+This API provides endpoints for college administrators to manage their college, students, events, and access dashboard statistics. All endpoints require proper authentication and authorization.
 
 ## Base URL
 ```
-http://localhost:4000/api/college-admin
+/api/college-admin
 ```
 
 ## Authentication
-College admin endpoints require JWT token from college admin login. Include the token in the `Authorization` header as `Bearer <college-admin-token>`. College admins must be approved by a super admin before they can log in and access these endpoints.
+College admins use JWT tokens for authentication. Include the token in the Authorization header:
+```
+Authorization: Bearer <jwt_token>
+```
 
-## College Admin Endpoints
+### Token Requirements
+- Tokens are obtained through the login process
+- Tokens expire after 7 days
+- Admins must be approved by super admin before accessing protected endpoints
 
-### Authentication Endpoints
+---
 
-#### 1. Register College Admin
-- **Method**: POST
-- **Path**: `/register`
-- **Description**: Registers a new college admin account. The admin will need to be approved by a super admin before they can log in.
-- **Request Body**:
-  ```json
-  {
+## 1. Registration and Authentication
+
+### 1.1 Register College Admin
+**Endpoint:** `POST /api/college-admin/register`
+
+**Description:** Register a new college admin account. Requires super admin approval before login.
+
+**Request Body:**
+```json
+{
+  "collegeName": "string (required)",
+  "email": "string (required)",
+  "password": "string (required)",
+  "confirmPassword": "string (required)"
+}
+```
+
+**Response (Success - 201):**
+```json
+{
+  "message": "College admin registered successfully. Please verify your email and wait for super admin approval.",
+  "firebaseUid": "string"
+}
+```
+
+**Error Responses:**
+- `400`: Missing required fields or passwords don't match
+- `400`: Admin with this email already exists
+- `500`: Internal server error
+
+### 1.2 Send OTP
+**Endpoint:** `POST /api/college-admin/send-otp`
+
+**Description:** Send OTP to college admin's email for login verification.
+
+**Request Body:**
+```json
+{
+  "email": "string (required)"
+}
+```
+
+**Response (Success - 200):**
+```json
+{
+  "message": "OTP sent to your email successfully"
+}
+```
+
+**Error Responses:**
+- `400`: Email is required
+- `403`: Admin not approved or email not verified
+- `404`: College admin not found
+- `500`: Internal server error
+
+### 1.3 Login with OTP
+**Endpoint:** `POST /api/college-admin/login`
+
+**Description:** Login using email and OTP. Returns JWT token upon successful authentication.
+
+**Request Body:**
+```json
+{
+  "email": "string (required)",
+  "otp": "string (required)"
+}
+```
+
+**Response (Success - 200):**
+```json
+{
+  "message": "Login successful",
+  "admin": {
+    "id": "string",
+    "collegeId": "string",
+    "email": "string"
+  },
+  "token": "string"
+}
+```
+
+**Error Responses:**
+- `400`: Missing email/OTP, invalid credentials, invalid/expired OTP
+- `403`: Admin not approved or email not verified
+- `500`: Internal server error
+
+---
+
+## 2. Profile Management
+
+### 2.1 Get Admin Profile
+**Endpoint:** `GET /api/college-admin/profile`
+
+**Authentication:** Required (JWT token)
+
+**Description:** Retrieve the authenticated college admin's profile information.
+
+**Response (Success - 200):**
+```json
+{
+  "profile": {
+    "id": "string",
+    "email": "string",
     "collegeName": "string",
+    "collegeDomain": "string",
+    "isApproved": "boolean",
+    "createdAt": "date"
+  }
+}
+```
+
+**Error Responses:**
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `404`: College admin not found
+- `500`: Internal server error
+
+
+### 2.2 Update Admin Profile
+**Endpoint:** `PUT /api/college-admin/profile`
+
+**Authentication:** Required (JWT token)
+
+**Description:** Update the authenticated college admin's profile information (College Name and/or Password).
+
+**Request Body:**
+```json
+{
+  "collegeName": "string (optional)",
+  "password": "string (optional)",
+  "confirmPassword": "string (required only if password is provided)"
+}
+```
+
+**Response (Success - 200):**
+```json
+{
+  "message": "Profile updated successfully (College Name, Password)",
+  "profile": {
+    "id": "string",
     "email": "string",
-    "password": "string",
-    "confirmPassword": "string"
+    "collegeName": "string"
   }
-  ```
-- **Response** (Success - 201):
-  ```json
-  {
-    "message": "College admin registered successfully"
-  }
-  ```
-- **Response** (Error - 400/500):
-  ```json
-  {
-    "error": "string"
-  }
-  ```
-- **Notes**: If the college doesn't exist, it will be created automatically. Passwords must match.
+}
+```
 
-#### 2. Login College Admin
-- **Method**: POST
-- **Path**: `/login`
-- **Description**: Logs in a college admin using email and password, returns JWT token. Admin must be approved.
-- **Request Body**:
-  ```json
-  {
-    "email": "string",
-    "password": "string"
-  }
-  ```
-- **Response** (Success - 200):
-  ```json
-  {
-    "message": "Login successful",
-    "admin": {
-      "id": "string",
-      "collegeId": "string",
-      "email": "string"
-    },
-    "token": "string (JWT token)"
-  }
-  ```
-- **Response** (Error - 400/403/500):
-  ```json
-  {
-    "error": "string"
-  }
-  ```
+**Error Responses:**
+- `400`: Passwords do not match or College Name already taken
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `404`: College admin not found
+- `500`: Internal server error
 
-### User Management Endpoints
+---
 
-#### 3. Get Users
-- **Method**: GET
-- **Path**: `/users`
-- **Description**: Retrieves the list of all users (students) in the authenticated college admin's college.
-- **Headers**: `Authorization: Bearer <college-admin-token>`
-- **Query Parameters** (optional): `collegeId` (defaults to admin's college)
-- **Response** (Success - 200):
-  ```json
-  {
-    "users": [
-      {
-        "name": "string",
-        "email": "string",
-        "department": "string",
-        "year": "string",
-        "status": "active",
-        "profileImage": "string"
-      }
-    ]
+## 3. Dashboard Statistics
+
+### 3.1 Get Dashboard Stats
+**Endpoint:** `GET /api/college-admin/dashboard/stats`
+
+**Authentication:** Required (JWT token)
+
+**Description:** Retrieve dashboard statistics for the college admin including student count, events, and registrations.
+
+**Response (Success - 200):**
+```json
+{
+  "stats": {
+    "totalStudents": "number",
+    "totalEvents": "number",
+    "activeEvents": "number",
+    "totalRegistrations": "number"
   }
-  ```
-- **Response** (Error - 403/500):
-  ```json
-  {
-    "error": "string"
+}
+```
+
+**Error Responses:**
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `404`: College admin not found
+- `500`: Internal server error
+
+---
+
+## 4. User/Student Management
+
+### 4.1 Get Users
+**Endpoint:** `GET /api/college-admin/users`
+
+**Authentication:** Required (JWT token)
+
+**Description:** Retrieve all users/students in the college. Can only view users from the admin's own college.
+
+**Query Parameters:**
+- `collegeId` (optional): College ID to filter users (defaults to admin's college)
+
+**Response (Success - 200):**
+```json
+{
+  "users": [
+    {
+      "name": "string",
+      "email": "string",
+      "department": "string",
+      "year": "string",
+      "status": "active",
+      "profileImage": "string"
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `401`: Invalid or missing token
+- `403`: Access denied (trying to view other college's users)
+- `500`: Internal server error
+
+### 4.2 Get Students
+**Endpoint:** `GET /api/college-admin/students`
+
+**Authentication:** Required (JWT token)
+
+**Description:** Alias for getting users/students in the college. Returns student information.
+
+**Response (Success - 200):**
+```json
+{
+  "students": [
+    {
+      "name": "string",
+      "email": "string",
+      "department": "string",
+      "year": "string",
+      "status": "active",
+      "profileImage": "string"
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `404`: College admin not found
+- `500`: Internal server error
+
+---
+
+## 5. Event Management
+
+### 5.1 Create Event
+**Endpoint:** `POST /api/college-admin/events/create`
+
+**Authentication:** Required (JWT token)
+
+**Description:** Create a new event for the college. Requires banner image upload.
+
+**Content-Type:** `multipart/form-data`
+
+**Request Body:**
+- `title`: string (required)
+- `date`: string (required, ISO date format)
+- `category`: string (required)
+- `location`: string (required)
+- `maxParticipants`: number (required)
+- `description`: string (required)
+- `banner`: file (required, image file)
+
+**Response (Success - 201):**
+```json
+{
+  "message": "Event created successfully",
+  "event": {
+    "_id": "string",
+    "title": "string",
+    "date": "date",
+    "category": "string",
+    "location": "string",
+    "maxParticipants": "number",
+    "description": "string",
+    "banner": "string (Cloudinary URL)",
+    "createdBy": "string",
+    "collegeId": "string",
+    "status": "active",
+    "registrations": [],
+    "likes": [],
+    "createdAt": "date",
+    "updatedAt": "date"
   }
-  ```
+}
+```
 
-### Event Management Endpoints
+**Error Responses:**
+- `400`: Missing required fields or invalid data
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `404`: College admin not found
+- `500`: Internal server error
 
-#### 4. Create Event
-- **Method**: POST
-- **Path**: `/events/create`
-- **Description**: Creates a new event for the college admin's college. Requires a banner image upload.
-- **Headers**: `Authorization: Bearer <college-admin-token>`
-- **Request Body** (form-data):
-  ```
-  title: string
-  date: string (ISO date)
-  category: string
-  location: string
-  maxParticipants: number
-  description: string
-  banner: [file] (image file)
-  ```
-- **Response** (Success - 201):
-  ```json
-  {
-    "message": "Event created successfully",
-    "event": {
+### 5.2 Get Admin Events
+**Endpoint:** `GET /api/college-admin/events`
+
+**Authentication:** Required (JWT token)
+
+**Description:** Retrieve all events created by the authenticated college admin.
+
+**Response (Success - 200):**
+```json
+{
+  "events": [
+    {
+      "_id": "string",
       "title": "string",
       "date": "date",
       "category": "string",
       "location": "string",
-      "maxParticipants": number,
+      "maxParticipants": "number",
       "description": "string",
-      "banner": "string (URL)",
-      "createdBy": "string",
+      "banner": "string",
+      "status": "active",
+      "registrations": [
+        {
+          "userId": "string",
+          "registeredAt": "date"
+        }
+      ],
+      "likes": ["string"],
+      "createdBy": {
+        "email": "string"
+      },
       "collegeId": "string",
-      "registrations": [],
-      "status": "active"
+      "createdAt": "date",
+      "updatedAt": "date"
     }
-  }
-  ```
-- **Response** (Error - 400/500):
-  ```json
-  {
-    "error": "string"
-  }
-  ```
+  ]
+}
+```
 
-#### 5. Get Admin Events
-- **Method**: GET
-- **Path**: `/events/admin/events`
-- **Description**: Retrieves all events created by the authenticated college admin.
-- **Headers**: `Authorization: Bearer <college-admin-token>`
-- **Response** (Success - 200):
-  ```json
-  {
-    "events": [
+**Error Responses:**
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `500`: Internal server error
+
+### 5.3 View Event Registrations
+**Endpoint:** `GET /api/college-admin/events/admin/registrations/:eventId`
+
+**Authentication:** Required (JWT token)
+
+**Description:** View all registrations for a specific event created by the admin.
+
+**Path Parameters:**
+- `eventId`: string (required) - ID of the event
+
+**Response (Success - 200):**
+```json
+{
+  "event": {
+    "title": "string",
+    "registrations": [
       {
-        "title": "string",
-        "date": "date",
-        "category": "string",
-        "location": "string",
-        "maxParticipants": number,
-        "description": "string",
-        "banner": "string",
-        "createdBy": {
-          "collegeName": "string",
-          "email": "string"
-        },
-        "registrations": ["userId1", "userId2"],
-        "status": "active|closed|postponed"
+        "displayName": "string",
+        "email": "string",
+        "fullName": "string",
+        "collegeName": "string"
       }
     ]
   }
-  ```
-- **Response** (Error - 500):
-  ```json
-  {
-    "error": "string"
-  }
-  ```
+}
+```
 
-#### 6. Admin View Registrations
-- **Method**: GET
-- **Path**: `/events/admin/registrations/:eventId`
-- **Description**: Retrieves the list of users registered for a specific event created by the admin.
-- **Headers**: `Authorization: Bearer <college-admin-token>`
-- **Parameters**: `eventId` (path parameter)
-- **Response** (Success - 200):
-  ```json
-  {
-    "event": {
-      "title": "string",
-      "registrations": [
-        {
-          "displayName": "string",
-          "email": "string",
-          "fullName": "string",
-          "collegeName": "string"
-        }
-      ]
-    }
-  }
-  ```
-- **Response** (Error - 404/500):
-  ```json
-  {
-    "error": "string"
-  }
-  ```
+**Error Responses:**
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `404`: Event not found
+- `500`: Internal server error
 
-#### 7. Update Event Status
-- **Method**: PUT
-- **Path**: `/events/admin/status/:eventId`
-- **Description**: Updates the status of an event created by the admin (active, closed, or postponed).
-- **Headers**: `Authorization: Bearer <college-admin-token>`
-- **Parameters**: `eventId` (path parameter)
-- **Request Body**:
-  ```json
-  {
-    "status": "active|closed|postponed"
-  }
-  ```
-- **Response** (Success - 200):
-  ```json
-  {
-    "message": "Event status updated successfully",
-    "event": { /* updated event object */ }
-  }
-  ```
-- **Response** (Error - 400/404/500):
-  ```json
-  {
-    "error": "string"
-  }
-  ```
+### 5.4 Update Event Status
+**Endpoint:** `PUT /api/college-admin/events/admin/status/:eventId`
 
-## Error Handling
-All endpoints return appropriate HTTP status codes and error messages in JSON format:
-- 200: Success
-- 201: Created
-- 400: Bad Request (validation errors, missing required fields)
-- 401: Unauthorized (missing/invalid token)
-- 403: Forbidden (admin not approved, access denied)
-- 404: Not Found (resource not found)
-- 500: Internal Server Error
+**Authentication:** Required (JWT token)
 
-Common error responses:
+**Description:** Update the status of an event created by the admin.
+
+**Path Parameters:**
+- `eventId`: string (required) - ID of the event
+
+**Request Body:**
 ```json
 {
-  "error": "Access denied. No token provided."
+  "status": "active | closed | postponed"
 }
 ```
+
+**Response (Success - 200):**
 ```json
 {
-  "error": "Invalid token for college admin."
-}
-```
-```json
-{
-  "error": "College admin not approved yet."
-}
-```
-```json
-{
-  "error": "Event not found or not authorized"
-}
-```
-
-## Security Features
-
-### Authentication & Authorization
-- **JWT Token Verification**: All protected endpoints require valid college admin JWT token
-- **Token Validation**: Tokens are verified for college admin privileges specifically
-- **Approval Check**: College admins must be approved by super admin before access
-- **Password Security**: Passwords are hashed using bcryptjs
-- **College Isolation**: Admins can only manage data within their own college
-
-### Data Access Control
-- **College-Scoped Access**: College admins can only view and manage data for their assigned college
-- **Event Ownership**: Admins can only modify events they created
-- **User Management**: Limited to viewing users within their college
-- **Audit Trail**: All operations are logged with college admin context
-
-## Usage Notes
-
-### Initial Setup
-1. Register using `/register` endpoint
-2. Wait for super admin approval
-3. Use `/login` to authenticate and get JWT token
-4. Use the token for all subsequent API calls
-
-### Event Management Workflow
-1. Create events using `/events/create` with banner image
-2. Monitor registrations using `/events/admin/registrations/:eventId`
-3. View all created events using `/events/admin/events`
-4. Update event status as needed using `/events/admin/status/:eventId`
-
-### User Management
-- Use `/users` to view all students in your college
-- This helps in understanding the college community and planning events
-
-### Best Practices
-- **Secure Token Storage**: Store JWT tokens securely and rotate regularly
-- **Image Upload**: Ensure banner images are in supported formats (jpg, png, jpeg, gif)
-- **Event Planning**: Check max participants and plan accordingly
-- **Regular Monitoring**: Use admin endpoints to monitor event registrations and user engagement
-- **Data Validation**: Always validate input data before operations
-
-## Database Models
-
-### CollegeAdmin Model
-```javascript
-{
-  collegeId: ObjectId (ref: 'College'),
-  email: String (required, unique),
-  password: String (required, hashed),
-  isApproved: Boolean (default: false),
-  createdAt: Date
-}
-```
-
-### College Model
-```javascript
-{
-  collegeName: String (required, unique),
-  domain: String (required, unique),
-  collegeId: String (required, unique),
-  createdAt: Date
-}
-```
-
-### Event Model
-```javascript
-{
-  title: String (required),
-  date: Date (required),
-  category: String (required),
-  location: String (required),
-  maxParticipants: Number (required),
-  description: String (required),
-  banner: String (required),
-  createdBy: ObjectId (ref: 'CollegeAdmin'),
-  collegeId: ObjectId (ref: 'College'),
-  registrations: [{
-    userId: ObjectId (ref: 'User'),
-    registeredAt: Date
-  }],
-  likes: [ObjectId (ref: 'User')],
-  status: String (enum: ['active', 'closed', 'postponed']),
-  createdAt: Date
-}
-```
-
-## API Integration Examples
-
-### JavaScript (Node.js) - Login Example
-```javascript
-const loginCollegeAdmin = async (email, password) => {
-  const response = await fetch('http://localhost:4000/api/college-admin/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const data = await response.json();
-  if (response.ok) {
-    localStorage.setItem('collegeAdminToken', data.token);
-    return data;
-  } else {
-    throw new Error(data.error);
+  "message": "Event status updated successfully",
+  "event": {
+    "_id": "string",
+    "title": "string",
+    "status": "string",
+    "updatedAt": "date"
   }
-};
+}
 ```
 
-### JavaScript - Create Event Example
-```javascript
-const createEvent = async (eventData, bannerFile) => {
-  const token = localStorage.getItem('collegeAdminToken');
-  const formData = new FormData();
-  formData.append('title', eventData.title);
-  formData.append('date', eventData.date);
-  formData.append('category', eventData.category);
-  formData.append('location', eventData.location);
-  formData.append('maxParticipants', eventData.maxParticipants);
-  formData.append('description', eventData.description);
-  formData.append('banner', bannerFile);
+**Error Responses:**
+- `400`: Invalid status value
+- `401`: Invalid or missing token
+- `403`: Admin not approved
+- `404`: Event not found or not authorized
+- `500`: Internal server error
 
-  const response = await fetch('http://localhost:4000/api/college-admin/events/create', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-    body: formData,
-  });
+---
 
-  const data = await response.json();
-  if (response.ok) {
-    return data;
-  } else {
-    throw new Error(data.error);
-  }
-};
+## Error Response Format
+All error responses follow this format:
+```json
+{
+  "error": "string"
+}
 ```
 
-This documentation covers all college admin functionality available in the Collegium backend system. The college admin role provides essential administrative capabilities for managing events and monitoring users within their institution.
+## Common HTTP Status Codes
+- `200`: Success
+- `201`: Created
+- `400`: Bad Request
+- `401`: Unauthorized
+- `403`: Forbidden
+- `404`: Not Found
+- `500`: Internal Server Error
+
+## Rate Limiting
+- OTP requests are rate-limited to prevent abuse
+- Consider implementing rate limiting for other endpoints as needed
+
+## File Upload Limits
+- Event banner images: Maximum file size depends on Cloudinary configuration
+- Supported formats: JPG, PNG, JPEG, GIF
+
+## Notes
+- All dates are in ISO 8601 format
+- Image URLs are hosted on Cloudinary
+- College admins can only manage resources within their own college
+- Super admin approval is required before admin accounts become active
+- Email verification is required before OTP login

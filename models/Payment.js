@@ -9,7 +9,6 @@ const paymentSchema = new mongoose.Schema({
   subscriptionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'UserSubscription',
-    required: true,
   },
   amount: {
     type: Number,

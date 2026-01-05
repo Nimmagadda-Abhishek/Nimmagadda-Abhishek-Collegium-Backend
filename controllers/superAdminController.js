@@ -8,6 +8,7 @@ const Event = require('../models/Event');
 const Project = require('../models/Project');
 const UserSubscription = require('../models/UserSubscription');
 const SubscriptionPlan = require('../models/SubscriptionPlan');
+const Company = require('../models/Company');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -173,7 +174,7 @@ const getAllProjects = async (req, res) => {
 // Get all subscriptions
 const getAllSubscriptions = async (req, res) => {
   try {
-    const subscriptions = await UserSubscription.find().populate('user', 'displayName email').populate('plan', 'name');
+    const subscriptions = await UserSubscription.find().populate('userId', 'displayName email').populate('planId', 'name');
     res.status(200).json({ subscriptions });
   } catch (error) {
     console.error('Get all subscriptions error:', error);
@@ -515,6 +516,101 @@ const deleteSubscriptionPlan = async (req, res) => {
   }
 };
 
+// Get all companies (pending and approved)
+const getCompanies = async (req, res) => {
+  try {
+    const companies = await Company.find().select('-password');
+    res.status(200).json({ companies });
+  } catch (error) {
+    console.error('Get companies error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Approve or reject company
+const approveCompany = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { isApproved } = req.body;
+
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    company.isApproved = isApproved;
+    await company.save();
+
+    res.status(200).json({ message: `Company ${isApproved ? 'approved' : 'rejected'} successfully`, company });
+  } catch (error) {
+    console.error('Approve company error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get specific company details
+const getCompanyById = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+
+    const company = await Company.findById(companyId).select('-password');
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    res.status(200).json({ company });
+  } catch (error) {
+    console.error('Get company by ID error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Verify or unverify company
+const verifyCompany = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { isVerified } = req.body;
+
+    console.log(`Attempting to set isVerified=${isVerified} for company ${companyId}`);
+    console.log('Request Body:', req.body);
+
+    if (typeof isVerified !== 'boolean') {
+      return res.status(400).json({ error: 'isVerified must be a boolean value' });
+    }
+
+    const company = await Company.findById(companyId);
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    company.isVerified = isVerified;
+    const updatedCompany = await company.save();
+    console.log(`Company ${companyId} updated. new isVerified status: ${updatedCompany.isVerified}`);
+
+    res.status(200).json({ message: `Company ${isVerified ? 'verified' : 'unverified'} successfully`, company: updatedCompany });
+  } catch (error) {
+    console.error('Verify company error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Delete company
+const deleteCompany = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+
+    const company = await Company.findByIdAndDelete(companyId);
+    if (!company) {
+      return res.status(404).json({ error: 'Company not found' });
+    }
+
+    res.status(200).json({ message: 'Company deleted successfully' });
+  } catch (error) {
+    console.error('Delete company error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -537,4 +633,9 @@ module.exports = {
   createSubscriptionPlan,
   updateSubscriptionPlan,
   deleteSubscriptionPlan,
+  getCompanies,
+  getCompanyById,
+  approveCompany,
+  verifyCompany,
+  deleteCompany,
 };
